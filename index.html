@@ -515,36 +515,54 @@ function render(){
 /* ---------- TELEGRAM ---------- */
 function tgText(){
   const r=calc(), m=S.manager, L=[];
-  L.push("📢 *Коммерческое предложение — M-CITY*");
+  const padR=(s,n)=>{s=String(s);return s+" ".repeat(Math.max(0,n-s.length));};
+  const padL=(s,n)=>{s=String(s);return " ".repeat(Math.max(0,n-s.length))+s;};
+  // моноширинная таблица: массив строк-массивов колонок, последняя колонка — по правому краю
+  const table=rows=>{
+    if(!rows.length)return "";
+    const cols=rows[0].length, w=[];
+    for(let c=0;c<cols;c++)w[c]=Math.max(...rows.map(rw=>String(rw[c]).length));
+    const body=rows.map(rw=>rw.map((v,c)=>c===cols-1?padL(v,w[c]):padR(v,w[c])).join("  ")).join("\n");
+    return "```\n"+body+"\n```";
+  };
+
+  L.push("📢 Коммерческое предложение — M-CITY");
   L.push("Реклама в лифтах · Красноярск");
   if(S.client)L.push("Для: "+S.client);
-  const gl=x=>x.gift?" — 🎁 в подарок":"";
+
   if(r.st.length){
-    L.push("\n🖼️ *Стенды в лифтах*");
-    r.st.forEach(x=>L.push(`• ${x.name} — ${x.fmt} — ${wStend(x.count)} — ${x.gift?'🎁 подарок':fmt(x.line)+' ₽'}`));
+    L.push("\n🖼️ Стенды в лифтах");
+    L.push(table(r.st.map(x=>[x.name, x.fmt, wStend(x.count), x.gift?"подарок":fmt(x.line)+" ₽"])));
     if(r.posSum)L.push("⭐ Позиционирование ("+posBreakText(r.posBreak)+"): +"+fmt(r.posSum)+" ₽");
-    if(S.standsPeriods>1)L.push("Периодов: "+S.standsPeriods+" × 30 дней");
+    if(S.standsPeriods>1)L.push("Срок: "+S.standsPeriods+" × 30 дней");
     if(r.standsDisc>0)L.push("Скидка на стенды "+r.standsDisc+"%: −"+fmt(r.standsDiscSum)+" ₽");
   }
   if(r.sc.length){
-    L.push("\n📺 *Экраны в лифтах*");
+    L.push("\n📺 Экраны в лифтах");
     L.push("Интенсивность: "+CFG.intensity[S.intensity].label+"/сутки, "+S.screensMonths+" "+plural(S.screensMonths,"месяц","месяца","месяцев"));
-    r.sc.forEach(x=>L.push(`• ${x.name} — ${wScreen(x.count)} — ${x.gift?'🎁 подарок':fmt(x.line)+' ₽'}`));
+    L.push(table(r.sc.map(x=>[x.name, wScreen(x.count), x.gift?"подарок":fmt(x.line)+" ₽"])));
     if(r.videoCost)L.push("+ видеоролик: "+fmt(r.videoCost)+" ₽");
     if(r.screensDisc>0)L.push("Скидка на экраны "+r.screensDisc+"%: −"+fmt(r.scDiscSum)+" ₽");
   }
+
   L.push("");
   if(r.benefit>0){
-    L.push("💰 Цена без акций и скидок: "+fmt(r.fullNoPromo)+" ₽");
-    L.push("💎 *Ваша цена: "+fmt(r.total)+" ₽*");
-    L.push("🎁 *ВАША ВЫГОДА: "+fmt(r.benefit)+" ₽*");
+    L.push(table([
+      ["Цена без скидок", fmt(r.fullNoPromo)+" ₽"],
+      ["Ваша цена",       fmt(r.total)+" ₽"],
+      ["ВАША ВЫГОДА",     fmt(r.benefit)+" ₽"]
+    ]));
   } else {
-    L.push("💎 *ИТОГО: "+fmt(r.total)+" ₽*");
+    L.push("💎 ИТОГО: "+fmt(r.total)+" ₽");
   }
   if(r.contacts>0){
-    L.push("\n📊 Покупателей: "+fmt(r.totalRes));
-    L.push("👁️ Медиаконтактов в месяц: "+fmt(r.contacts)+" (в день: "+fmt(r.contacts/30)+")");
-    L.push("🎯 Стоимость 1 контакта: "+fmt2(r.cpc)+" ₽");
+    L.push("");
+    L.push(table([
+      ["Покупателей",            fmt(r.totalRes)],
+      ["Медиаконтактов / мес",   fmt(r.contacts)],
+      ["Медиаконтактов / день",  fmt(r.contacts/30)],
+      ["Стоимость 1 контакта",   fmt2(r.cpc)+" ₽"]
+    ]));
   }
   if(S.sfera!==""&&S.pics.size){
     const sf=SFERI[+S.sfera];
