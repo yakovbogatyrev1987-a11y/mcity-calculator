@@ -547,6 +547,7 @@ function tgText(){
 
   L.push("");
   if(r.benefit>0){
+    L.push("💰 Стоимость и выгода:");
     L.push(table([
       ["Цена без скидок", fmt(r.fullNoPromo)+" ₽"],
       ["Ваша цена",       fmt(r.total)+" ₽"],
@@ -556,13 +557,9 @@ function tgText(){
     L.push("💎 ИТОГО: "+fmt(r.total)+" ₽");
   }
   if(r.contacts>0){
-    L.push("");
-    L.push(table([
-      ["Покупателей",            fmt(r.totalRes)],
-      ["Медиаконтактов / мес",   fmt(r.contacts)],
-      ["Медиаконтактов / день",  fmt(r.contacts/30)],
-      ["Стоимость 1 контакта",   fmt2(r.cpc)+" ₽"]
-    ]));
+    L.push("\n📊 Покупателей: "+fmt(r.totalRes));
+    L.push("👁️ Медиаконтактов в месяц: "+fmt(r.contacts)+" (в день: "+fmt(r.contacts/30)+")");
+    L.push("🎯 Стоимость 1 контакта: "+fmt2(r.cpc)+" ₽");
   }
   if(S.sfera!==""&&S.pics.size){
     const sf=SFERI[+S.sfera];
