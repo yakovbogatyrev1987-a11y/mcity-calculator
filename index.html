@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M-CITY · Калькулятор рекламы в лифтах</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel-2:#1f232c; --line:#2a2f3a;
+    --text:#e7eaf0; --muted:#9aa3b2; --accent:#e21f2b; --accent-2:#ff5a5a;
+    --ok:#36c08a; --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:radial-gradient(1200px 600px at 80% -10%,#20141a 0%,var(--bg) 55%);
+    color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Arial,sans-serif;
+    line-height:1.45;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1200px;margin:0 auto;padding:24px 18px 90px}
+  header.top{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+  .logo{width:54px;height:54px;border-radius:12px;flex:0 0 auto;background:#111;border:2px solid var(--accent);
+    display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;color:#fff}
+  .logo b{color:var(--accent)}
+  .brand h1{font-size:20px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:13px}
+
+  .grid{display:grid;grid-template-columns:1fr 400px;gap:20px;align-items:start}
+  @media (max-width:960px){.grid{grid-template-columns:1fr}}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow:hidden;margin-bottom:18px}
+  .card .hd{padding:13px 18px;border-bottom:1px solid var(--line);font-weight:600;font-size:15px;
+    display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+  .card .hd .toggle{margin-left:auto;color:var(--muted);font-size:13px;font-weight:400}
+  .card .hd .cnt{background:var(--accent);color:#fff;font-size:11px;font-weight:700;border-radius:999px;
+    padding:2px 9px;margin-left:6px}
+  .card .bd{padding:18px}
+
+  .field{margin-bottom:18px}.field:last-child{margin-bottom:0}
+  label.lbl{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--muted);margin-bottom:9px}
+  .mini{font-size:11px;color:var(--muted)}
+
+  .opts{display:flex;gap:8px;flex-wrap:wrap}
+  .opt{flex:1 1 auto;min-width:84px;cursor:pointer;border:1px solid var(--line);background:var(--panel-2);
+    border-radius:10px;padding:9px 11px;transition:.12s;user-select:none;text-align:center}
+  .opt:hover{border-color:#3a4150}
+  .opt .t{font-weight:700;font-size:14px}.opt .s{font-size:11px;color:var(--muted);margin-top:1px}
+  .opt.sel{border-color:var(--accent);background:linear-gradient(180deg,rgba(226,31,43,.14),rgba(226,31,43,.04))}
+  .opt.sel .t{color:#fff}
+
+  .toolbar{display:flex;gap:8px;margin-bottom:8px}
+  .toolbar input{flex:1;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    border-radius:9px;padding:8px 11px;font-size:13px;outline:none;font-family:inherit}
+  .toolbar button{background:var(--panel-2);border:1px solid var(--line);color:var(--muted);border-radius:9px;
+    padding:0 12px;font-size:12px;cursor:pointer;font-family:inherit}
+  .toolbar button:hover{border-color:#3a4150;color:var(--text)}
+
+  .listbox{border:1px solid var(--line);border-radius:11px;max-height:420px;overflow:auto;background:var(--panel-2)}
+  .grp{position:sticky;top:0;background:#262b35;color:var(--accent-2);font-size:11px;font-weight:700;
+    letter-spacing:.4px;text-transform:uppercase;padding:7px 12px;border-bottom:1px solid var(--line)}
+  .it{border-bottom:1px solid #232831}
+  .it .head{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer}
+  .it .head:hover{background:#232831}
+  .it.dis .head{opacity:.35;cursor:not-allowed}
+  .it .chk{width:18px;height:18px;border-radius:5px;border:1px solid #3a4150;flex:0 0 auto;display:flex;
+    align-items:center;justify-content:center;font-size:12px;color:#fff}
+  .it.sel .chk{background:var(--accent);border-color:var(--accent)}
+  .it .nm{flex:1;font-size:14px}
+  .it .meta{font-size:11px;color:var(--muted);text-align:right;line-height:1.3}
+  .it.sel{background:rgba(226,31,43,.06)}
+  .it .body{padding:0 12px 12px 40px;display:none}
+  .it.sel .body{display:block}
+
+  .fmtrow{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 2px}
+  .fmtbtn{cursor:pointer;border:1px solid var(--line);background:#222732;border-radius:8px;padding:6px 10px;
+    font-size:13px;font-weight:700;min-width:46px;text-align:center}
+  .fmtbtn .p{display:block;font-size:10px;font-weight:400;color:var(--muted)}
+  .fmtbtn.sel{border-color:var(--accent);background:rgba(226,31,43,.18);color:#fff}
+  .fmtbtn.na{opacity:.3;cursor:not-allowed}
+
+  .matrix{margin-top:4px}
+  .matrix .ttl{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .matrix svg{max-width:100%;height:auto;background:#0c0e12;border-radius:10px;padding:6px}
+  .cell{cursor:pointer}
+
+  select,input[type=number],input[type=text],input[type=email]{width:100%;background:var(--panel-2);
+    border:1px solid var(--line);color:var(--text);border-radius:10px;padding:11px 12px;font-size:14px;
+    outline:none;font-family:inherit}
+  select:focus,input:focus{border-color:var(--accent)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+  .stepper{display:inline-flex;align-items:center}
+  .stepper button{width:38px;height:38px;border:1px solid var(--line);background:var(--panel-2);color:var(--text);
+    font-size:19px;cursor:pointer}
+  .stepper button:first-child{border-radius:9px 0 0 9px}.stepper button:last-child{border-radius:0 9px 9px 0}
+  .stepper input{width:60px;text-align:center;border-left:none;border-right:none;border-radius:0}
+
+  .check{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;padding:11px 13px;
+    border:1px solid var(--line);border-radius:11px;background:var(--panel-2)}
+  .check.sel{border-color:var(--accent);background:rgba(226,31,43,.08)}
+  .check .box{width:20px;height:20px;border-radius:6px;border:1px solid #3a4150;display:flex;align-items:center;
+    justify-content:center;font-size:13px;color:#fff;flex:0 0 auto}
+  .check.sel .box{background:var(--accent);border-color:var(--accent)}
+  .check .tx{flex:1;font-size:14px}.check .tx small{display:block;color:var(--muted);font-size:12px}
+  .check .pr{font-weight:700;font-size:14px}
+
+  .hint{font-size:12px;color:var(--muted);margin-top:7px}
+
+  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:7px;margin-top:10px;
+    max-height:280px;overflow:auto}
+  .thumb{position:relative;aspect-ratio:3/4;border-radius:8px;overflow:hidden;border:2px solid var(--line);
+    background:#0c0e12;cursor:pointer}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb.sel{border-color:var(--accent)}
+  .thumb.sel::after{content:"✓";position:absolute;top:3px;right:4px;background:var(--accent);color:#fff;
+    width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+
+  .sum{position:sticky;top:18px}
+  .sblock{margin-bottom:12px}
+  .sblock .bt{font-size:12px;color:var(--accent-2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+  .sline{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed var(--line);font-size:13px}
+  .sline .k{color:var(--muted)}.sline .v{font-weight:600;white-space:nowrap}
+  .sline.disc .v{color:var(--ok)}
+  .total{display:flex;justify-content:space-between;align-items:baseline;margin-top:14px}
+  .total .k{color:var(--muted);font-size:14px}.total .v{font-size:30px;font-weight:800;letter-spacing:-.5px}
+  .total .v small{font-size:15px;font-weight:600;color:var(--muted)}
+  .mediabox{margin-top:12px;background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:12px}
+  .mediabox .mt{font-size:11px;color:var(--accent-2);font-weight:700;text-transform:uppercase;margin-bottom:8px}
+  .mrow{display:flex;justify-content:space-between;font-size:13px;padding:3px 0}
+  .mrow .k{color:var(--muted)}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:14px 0}
+
+  .btns{display:grid;gap:10px;margin-top:16px}
+  .btn{border:none;border-radius:11px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px;transition:.12s;font-family:inherit}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;box-shadow:0 6px 18px rgba(226,31,43,.3)}
+  .btn.primary:hover{filter:brightness(1.07)}
+  .btn.ghost{background:var(--panel-2);color:var(--text);border:1px solid var(--line)}
+  .btn.ghost:hover{border-color:#3a4150}
+
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:var(--ok);
+    color:#03291d;font-weight:700;padding:12px 20px;border-radius:12px;opacity:0;pointer-events:none;
+    transition:.25s;z-index:50;box-shadow:var(--shadow)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  @page{margin:10mm}
+  @media print{ body{background:#fff} .wrap{display:none} #printArea{display:block !important} }
+  #printArea{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">M<b>·</b>CITY</div>
+    <div class="brand">
+      <h1>Калькулятор рекламы в лифтах</h1>
+      <p>M-CITY · лидер лифтовой рекламы Красноярска · m-city124.ru</p>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div>
+      <!-- ===== 1. СТЕНДЫ ===== -->
+      <div class="card">
+        <div class="hd" data-card="stands">🖼️ Стенды в лифтах <span class="cnt" id="cntStands">0</span>
+          <span class="toggle" id="tgStands">свернуть ▲</span></div>
+        <div class="bd" id="bdStands">
+          <div class="field">
+            <div class="toolbar">
+              <input type="text" id="standsSearch" placeholder="Поиск района…">
+              <button type="button" data-act="clear-stands">Сброс</button>
+            </div>
+            <div class="listbox" id="standsList"></div>
+            <div class="hint">Отметьте район → выберите формат. У каждого района может быть свой формат.</div>
+          </div>
+          <div class="field">
+            <label class="lbl">Количество периодов размещения <span class="mini">(1 период = 30 дней, −7 дней в подарок)</span></label>
+            <div class="stepper"><button type="button" data-step="standsPeriods,-1">−</button>
+              <input type="number" id="standsPeriods" value="1" min="1"><button type="button" data-step="standsPeriods,1">+</button></div>
+          </div>
+          <div class="field">
+            <label class="lbl">Скидка на стенды, %</label>
+            <input type="number" id="discStands" value="0" min="0" max="50">
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 2. ПРИМЕРНОЕ МЕСТО НА СТЕНДЕ ===== -->
+      <div class="card">
+        <div class="hd" data-card="place">📍 Примерное место на стенде <span class="toggle" id="tgPlace">свернуть ▲</span></div>
+        <div class="bd" id="bdPlace">
+          <div id="matrixBox"></div>
+          <div class="hint">Кликните ячейку — это «примерное место» рекламы клиента. Оно попадёт в КП, чтобы клиенту было наглядно.</div>
+        </div>
+      </div>
+
+      <!-- ===== 3. ПОЗИЦИОНИРОВАНИЕ ===== -->
+      <div class="card">
+        <div class="hd" data-card="pos">⭐ Позиционирование <span class="toggle" id="tgPos">свернуть ▲</span></div>
+        <div class="bd" id="bdPos">
+          <label class="check" id="posCheck"><span class="box"></span>
+            <span class="tx">Платное позиционирование<small>Считается из мест, отмеченных на матрице</small></span>
+            <span class="pr" id="posPrice">+0 ₽</span></label>
+          <div class="hint" id="posBreak"></div>
+          <div class="hint">Цена места по формату: F6 +3000, F5 +4000, F4 +5000, F3 +6000 ₽. Несколько мест суммируются.</div>
+        </div>
+      </div>
+
+      <!-- ===== 4. ЭКРАНЫ ===== -->
+      <div class="card">
+        <div class="hd" data-card="screens">📺 Экраны в лифтах <span class="cnt" id="cntScreens">0</span>
+          <span class="toggle" id="tgScreens">свернуть ▲</span></div>
+        <div class="bd" id="bdScreens">
+          <div class="field">
+            <label class="lbl">Интенсивность показа</label>
+            <div class="opts" id="intensity"></div>
+            <div class="hint">Ролик до 10 сек. Чем выше интенсивность — тем чаще крутится ваше видео.</div>
+          </div>
+          <div class="field">
+            <div class="toolbar">
+              <input type="text" id="screensSearch" placeholder="Поиск ЖК / БЦ…">
+              <button type="button" data-act="clear-screens">Сброс</button>
+            </div>
+            <div class="listbox" id="screensList"></div>
+          </div>
+          <div class="field">
+            <label class="lbl">Количество месяцев</label>
+            <div class="stepper"><button type="button" data-step="screensMonths,-1">−</button>
+              <input type="number" id="screensMonths" value="1" min="1"><button type="button" data-step="screensMonths,1">+</button></div>
+          </div>
+          <div class="field">
+            <label class="check" id="videoCheck"><span class="box"></span>
+              <span class="tx">Разработка видеоролика<small>10 сек · 3 бесплатные корректировки</small></span>
+              <span class="pr">+2 900 ₽</span></label>
+          </div>
+          <div class="field">
+            <label class="lbl">Доп. корректировки готового видео <span class="mini">1 500 ₽ за шт.</span></label>
+            <div class="stepper"><button type="button" data-step="videoFix,-1">−</button>
+              <input type="number" id="videoFix" value="0" min="0"><button type="button" data-step="videoFix,1">+</button></div>
+          </div>
+          <div class="field">
+            <label class="lbl">Скидка на экраны, %</label>
+            <input type="number" id="discScreens" value="0" min="0" max="50">
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 5. ПРИМЕРЫ РАБОТ ===== -->
+      <div class="card">
+        <div class="hd" data-card="sfera">📸 Примеры наших работ <span class="cnt" id="cntPics">0</span>
+          <span class="toggle" id="tgSfera">свернуть ▲</span></div>
+        <div class="bd" id="bdSfera">
+          <div class="field">
+            <label class="lbl">Сфера клиента</label>
+            <select id="sfera"><option value="">— выберите сферу —</option></select>
+          </div>
+          <div class="field" id="picsField" style="display:none">
+            <label class="lbl"><span>Отметьте нужные макеты</span>
+              <span><button type="button" class="mini" data-act="pics-all" style="background:none;border:none;color:var(--accent-2);cursor:pointer">все</button> ·
+              <button type="button" class="mini" data-act="pics-none" style="background:none;border:none;color:var(--accent-2);cursor:pointer">сброс</button></span></label>
+            <div class="thumbs" id="thumbs"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===== СВОДКА ===== -->
+    <div class="card sum">
+      <div class="hd">₽ Расчёт стоимости</div>
+      <div class="bd">
+        <div id="lines"></div>
+        <div class="total"><span class="k">Итого</span><span class="v" id="total">0 <small>₽</small></span></div>
+        <div id="mediaSummary"></div>
+        <div class="btns">
+          <button class="btn primary" id="btnPdf">📄 Скачать PDF (КП)</button>
+          <button class="btn ghost" id="btnTg">📋 Скопировать для Telegram</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="printArea"></div>
+<div class="toast" id="toast">Готово ✓</div>
+
+<script src="data.js"></script>
+<script src="sferi.js"></script>
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const fmt=n=>Math.round(n).toLocaleString("ru-RU");
+const fmt2=n=>n.toLocaleString("ru-RU",{minimumFractionDigits:2,maximumFractionDigits:2});
+const plural=(n,a,b,c)=>{const m=n%10,h=n%100;return m===1&&h!==11?a:(m>=2&&m<=4&&(h<10||h>=20)?b:c)};
+const wStend=n=>n+" "+plural(n,"стенд","стенда","стендов");
+const wScreen=n=>n+" "+plural(n,"экран","экрана","экранов");
+const wBuyer=n=>fmt(n)+" "+plural(n,"покупатель","покупателя","покупателей");
+const CFG=DATA.config, V=CFG.viewsPerResidentMonth;
+
+/* Матрицы стендов (точная сетка из xlsx). Слот: [col,row,colSpan,rowSpan,формат] */
+const MATRIX={
+  std:{cols:5,rows:10,slots:[
+    [0,0,1,4,"F4"],[1,0,1,4,"F4"],[2,0,1,2,"F6"],[2,2,1,2,"F6"],[3,0,1,2,"F5"],[3,2,1,2,"F5"],[4,0,1,4,"F4"],
+    [0,4,1,2,"F5"],[1,4,1,2,"F5"],[2,4,1,2,"F6"],[3,4,2,2,"F4"],
+    [0,6,1,4,"F4"],[1,6,1,4,"F4"],[2,6,1,2,"F6"],[2,8,1,2,"F6"],[3,6,2,4,"F3"]
+  ]},
+  south:{cols:5,rows:12,slots:[
+    [0,0,1,4,"F4"],[1,0,1,4,"F4"],[2,0,1,4,"F4"],[3,0,2,4,"F3"],
+    [0,4,3,2,"F3"],[3,4,2,2,"F4"],
+    [0,6,2,2,"F4"],[2,6,3,2,"F3"],
+    [0,8,1,4,"F4"],[1,8,1,4,"F4"],[2,8,1,4,"F4"],[3,8,2,4,"F3"]
+  ]}
+};
+
+const S={
+  stands:new Map(),        // i -> formatIndex
+  standsGifts:new Set(),   // i (район в подарок)
+  slotsStd:new Set(), slotsSouth:new Set(),  // выбранные ячейки матрицы
+  posAll:false,
+  screens:new Set(),       // "g|i"
+  screensGifts:new Set(),  // "g|i" (ЖК в подарок)
+  intensity:0, screensMonths:1, standsPeriods:1,
+  video:false, videoFix:0,
+  standsDiscount:0, screensDiscount:0,
+  sfera:"", pics:new Set(),
+  client:"", manager:loadMgr()
+};
+const posFee=label=>{const f=CFG.formats.find(x=>x.id===label);return f?f.pos:0;};
+function loadMgr(){try{return JSON.parse(localStorage.getItem("mcity_mgr"))||{}}catch(e){return {}}}
+function saveMgr(){localStorage.setItem("mcity_mgr",JSON.stringify(S.manager))}
+function isSouth(i){const n=DATA.stands[i].name;return n.indexOf("Образцово")>=0||n.indexOf("Южный Берег")>=0;}
+
+/* ---------- МАТРИЦА (SVG) ---------- */
+function matrixSVG(kind,selSet,interactive){
+  const m=MATRIX[kind], uw=48, uh=15, padX=10, padTop=24, gap=2;
+  const W=padX*2+m.cols*uw, H=padTop+m.rows*uh+8;
+  const tint={F6:"#e8f1ff",F5:"#eafbf1",F4:"#fff4e6",F3:"#fde8ea"};
+  let cells="";
+  m.slots.forEach((s,idx)=>{
+    const[col,row,cs,rs,f]=s;
+    const x=padX+col*uw+gap, y=padTop+row*uh+gap, w=cs*uw-gap*2, h=rs*uh-gap*2;
+    const on=selSet&&selSet.has(idx);
+    const fill=on?"#e21f2b":tint[f], stroke=on?"#a10f18":"#cfd6e0";
+    cells+=`<rect class="cell" ${interactive?`data-slotfor="${kind}" data-slot="${idx}" style="cursor:pointer"`:""} x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1.4"/>`;
+    cells+=`<text x="${x+w/2}" y="${y+h/2-2}" text-anchor="middle" font-size="11" font-weight="700" fill="${on?'#fff':'#555'}" font-family="Arial">${f}</text>`;
+    if(on) cells+=`<text x="${x+w/2}" y="${y+h/2+11}" text-anchor="middle" font-size="8" fill="#fff" font-family="Arial">место клиента</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1" y="14" width="${W-2}" height="${H-15}" rx="8" fill="#f6f8fb" stroke="#bbb" stroke-width="1.5"/>
+    <text x="${W/2}" y="10" text-anchor="middle" font-size="11" font-weight="700" fill="#333" font-family="Arial">${kind==="south"?"СТЕНД У ВХОДА В ЛИФТ (Южный берег / Образцово)":"СТЕНД В ЛИФТЕ"}</text>
+    ${cells}</svg>`;
+}
+
+/* ---------- ПОСТРОЕНИЕ UI ---------- */
+function buildUI(){
+  $("#intensity").innerHTML=CFG.intensity.map((t,i)=>`<div class="opt ${i===S.intensity?'sel':''}" data-int="${i}">
+    <div class="t">${t.label}</div><div class="s">${t.sub}</div></div>`).join("");
+  $("#sfera").innerHTML='<option value="">— выберите сферу —</option>'+
+    SFERI.map((s,i)=>`<option value="${i}">${s.name} (${s.count})</option>`).join("");
+  renderStands(); renderScreens(); renderPlace();
+}
+
+function renderStands(q=""){
+  q=q.trim().toLowerCase();
+  const rows=DATA.stands.map((r,i)=>({r,i})).filter(o=>!q||o.r.name.toLowerCase().includes(q));
+  $("#standsList").innerHTML=rows.map(({r,i})=>{
+    const sel=S.stands.has(i), f=S.stands.get(i);
+    const price=sel?r.p[f]:null;
+    const fmtBtns=CFG.formats.map((ff,fi)=>{const na=r.p[fi]==null;
+      return `<div class="fmtbtn ${f===fi&&!na?'sel':''} ${na?'na':''}" data-fmtfor="${i}" data-f="${fi}">
+        ${ff.label}<span class="p">${na?'—':fmt(r.p[fi])+'₽'}</span></div>`;}).join("");
+    const gift=S.standsGifts.has(i);
+    const body=sel?`<div class="body"><div class="fmtrow">${fmtBtns}</div>
+      <div class="minirow"><span class="pillchk ${gift?'sel':''}" data-giftstand="${i}"><span class="b">${gift?'✓':''}</span>🎁 Район в подарок (0 ₽)</span></div></div>`:"";
+    const priceLabel=sel&&price!=null?(gift?'<br><b style="color:#36c08a">подарок</b>':'<br><b style="color:#e7eaf0">'+fmt(price)+' ₽</b>'):'';
+    return `<div class="it ${sel?'sel':''}" data-stand="${i}"><div class="head">
+      <span class="chk">${sel?'✓':''}</span><span class="nm">${r.name}</span>
+      <span class="meta">${wStend(r.count)}<br>${r.res?wBuyer(r.res):''}${priceLabel}</span>
+      </div>${body}</div>`;
+  }).join("");
+  $("#cntStands").textContent=S.stands.size;
+}
+
+function renderScreens(q=""){
+  q=q.trim().toLowerCase();
+  let html="";
+  DATA.screens.forEach((grp,gi)=>{
+    const items=grp.items.map((r,ii)=>({r,ii})).filter(o=>!q||o.r.name.toLowerCase().includes(q));
+    if(!items.length)return;
+    html+=`<div class="grp">${grp.g}</div>`;
+    items.forEach(({r,ii})=>{const key=gi+"|"+ii, sel=S.screens.has(key), p=r.p[S.intensity], gift=S.screensGifts.has(key);
+      const body=sel?`<div class="body"><div class="minirow"><span class="pillchk ${gift?'sel':''}" data-giftscreen="${key}"><span class="b">${gift?'✓':''}</span>🎁 В подарок (0 ₽)</span></div></div>`:"";
+      const pr=gift?'<b style="color:#36c08a">подарок</b>':'<b style="color:#e7eaf0">'+fmt(p)+' ₽</b>';
+      html+=`<div class="it ${sel?'sel':''}" data-screen="${key}"><div class="head">
+        <span class="chk">${sel?'✓':''}</span><span class="nm">${r.name}</span>
+        <span class="meta">${wScreen(r.count)}<br>${r.res?wBuyer(r.res):''}<br>${pr}</span>
+        </div>${body}</div>`;});
+  });
+  $("#screensList").innerHTML=html;
+  $("#cntScreens").textContent=S.screens.size;
+}
+
+function renderPlace(){
+  const keys=[...S.stands.keys()];
+  const stdSel=keys.some(i=>!isSouth(i)), southSel=keys.some(i=>isSouth(i));
+  if(!keys.length){$("#matrixBox").innerHTML='<div class="hint">Сначала выберите районы в блоке «Стенды в лифтах».</div>';return;}
+  let h="";
+  if(stdSel)h+=`<div class="matrix"><div class="ttl">Обычные стенды — отметьте места (можно несколько):</div>${matrixSVG("std",S.slotsStd,true)}</div>`;
+  if(southSel)h+=`<div class="matrix" style="margin-top:14px"><div class="ttl">Южный берег / Образцово (можно несколько):</div>${matrixSVG("south",S.slotsSouth,true)}</div>`;
+  $("#matrixBox").innerHTML=h;
+}
+
+function renderThumbs(){
+  const f=$("#picsField");
+  if(S.sfera===""){f.style.display="none";$("#thumbs").innerHTML="";$("#cntPics").textContent=0;return;}
+  f.style.display="";
+  const sf=SFERI[+S.sfera];
+  $("#thumbs").innerHTML=sf.imgs.map((u,idx)=>`<div class="thumb ${S.pics.has(idx)?'sel':''}" data-pic="${idx}">
+    <img loading="lazy" src="${u}"></div>`).join("");
+  $("#cntPics").textContent=S.pics.size;
+}
+
+/* ---------- РАСЧЁТ ---------- */
+function calc(){
+  // позиционирование = сумма выбранных ячеек матрицы (по формату), ×периодов
+  let posRaw=0; const posBreak={};
+  S.slotsStd.forEach(idx=>{const f=MATRIX.std.slots[idx][4];posRaw+=posFee(f);posBreak[f]=(posBreak[f]||0)+1;});
+  S.slotsSouth.forEach(idx=>{const f=MATRIX.south.slots[idx][4];posRaw+=posFee(f);posBreak[f]=(posBreak[f]||0)+1;});
+  posRaw*=S.standsPeriods;
+  const posSum=S.posAll?posRaw:0;
+
+  const st=[]; let standsItems=0,standsContacts=0,standsRes=0,standsUnits=0,giftStands=0;
+  S.stands.forEach((f,i)=>{
+    const r=DATA.stands[i], price=r.p[f]; if(price==null)return;
+    const gift=S.standsGifts.has(i);
+    const line=gift?0:price*S.standsPeriods, contacts=r.res*V*S.standsPeriods;
+    standsItems+=line; standsContacts+=contacts; standsRes+=r.res; standsUnits+=r.count; if(gift)giftStands++;
+    st.push({i,name:r.name,count:r.count,res:r.res,fmt:CFG.formats[f].label,fi:f,gift,
+      line,full:price*S.standsPeriods,contacts,cpc:(!gift&&r.res)?price/(r.res*V):0});
+  });
+  const standsBase=standsItems+posSum;
+
+  const sc=[]; let scItems=0,scContacts=0,scRes=0,scUnits=0,giftScreens=0;
+  S.screens.forEach(key=>{const[gi,ii]=key.split("|").map(Number); const r=DATA.screens[gi].items[ii];
+    const gift=S.screensGifts.has(key);
+    const pm=r.p[S.intensity], line=gift?0:pm*S.screensMonths, contacts=r.res*V*S.screensMonths;
+    scItems+=line; scContacts+=contacts; scRes+=r.res; scUnits+=r.count; if(gift)giftScreens++;
+    sc.push({key,name:r.name,count:r.count,res:r.res,gift,line,full:pm*S.screensMonths,contacts,cpc:(!gift&&r.res)?pm/(r.res*V):0});});
+  let videoCost=0;
+  if(S.screens.size){ if(S.video)videoCost+=CFG.video.make; if(S.videoFix>0)videoCost+=CFG.video.fix*S.videoFix; }
+  const scBase=scItems+videoCost;
+
+  const dS=Math.min(50,Math.max(0,S.standsDiscount||0)), dC=Math.min(50,Math.max(0,S.screensDiscount||0));
+  const standsDiscSum=standsBase*dS/100, scDiscSum=scBase*dC/100;
+  const base=standsBase+scBase, discSum=standsDiscSum+scDiscSum, total=base-discSum;
+  const contacts=standsContacts+scContacts, totalRes=standsRes+scRes;
+  // цена без акций и скидок: все позиции по полной (подарки тоже), позиционирование и видео те же
+  const fullStands=st.reduce((a,x)=>a+x.full,0)+posSum;
+  const fullScreens=sc.reduce((a,x)=>a+x.full,0)+videoCost;
+  const fullNoPromo=fullStands+fullScreens;
+  const benefit=fullNoPromo-total;        // выгода клиента
+  return {st,sc,standsBase,scBase,videoCost,base,discSum,total,contacts,totalRes,
+    standsUnits,scUnits,giftStands,giftScreens,posRaw,posSum,posBreak,
+    fullNoPromo,benefit,
+    standsDisc:dS,screensDisc:dC,standsDiscSum,scDiscSum,cpc:contacts?total/contacts:0};
+}
+
+/* ---------- СВОДКА ---------- */
+function posBreakText(b){const o=Object.keys(b).filter(k=>b[k]);return o.length?o.map(k=>k+"×"+b[k]).join(" + "):"";}
+function render(){
+  renderPlace();
+  const r=calc();
+  // блок позиционирования
+  $("#posCheck").classList.toggle("sel",S.posAll);
+  $("#posPrice").textContent="+"+fmt(r.posSum)+" ₽";
+  const bt=posBreakText(r.posBreak);
+  $("#posBreak").innerHTML = (S.slotsStd.size+S.slotsSouth.size)
+    ? `Выбрано мест: <b>${bt}</b> → ${fmt(r.posRaw)} ₽${S.standsPeriods>1?' (×'+S.standsPeriods+' периодов учтено)':''}. ${S.posAll?'Включено в стоимость.':'Тумблер выключен — места показаны как «примерные», без доплаты.'}`
+    : 'Отметьте места в блоке «Примерное место на стенде» — сумма посчитается автоматически.';
+
+  if(!r.st.length && !r.sc.length){
+    $("#lines").innerHTML='<div class="empty">Выберите стенды и/или экраны</div>';
+    $("#total").innerHTML='0 <small>₽</small>'; $("#mediaSummary").innerHTML=""; return;
+  }
+  const giftTag=x=>x.gift?' <span style="color:var(--ok)">🎁</span>':'';
+  const val=x=>x.gift?'<span style="color:var(--ok)">подарок</span>':fmt(x.line)+' ₽';
+  let h="";
+  if(r.st.length){
+    h+=`<div class="sblock"><div class="bt">Стенды</div>`+
+      r.st.map(x=>`<div class="sline"><span class="k">${x.name} · ${x.fmt}${giftTag(x)}</span><span class="v">${val(x)}</span></div>`).join("")+
+      (r.posSum?`<div class="sline"><span class="k">⭐ Позиционирование (${bt})</span><span class="v">${fmt(r.posSum)} ₽</span></div>`:"")+
+      (r.standsDisc>0?`<div class="sline disc"><span class="k">Скидка на стенды ${r.standsDisc}%</span><span class="v">−${fmt(r.standsDiscSum)} ₽</span></div>`:"")+`</div>`;
+  }
+  if(r.sc.length){
+    h+=`<div class="sblock"><div class="bt">Экраны · ${CFG.intensity[S.intensity].label}/сут</div>`+
+      r.sc.map(x=>`<div class="sline"><span class="k">${x.name}${giftTag(x)}</span><span class="v">${val(x)}</span></div>`).join("")+
+      (r.videoCost?`<div class="sline"><span class="k">Видео${S.videoFix>0?' + '+S.videoFix+' корр.':''}</span><span class="v">${fmt(r.videoCost)} ₽</span></div>`:"")+
+      (r.screensDisc>0?`<div class="sline disc"><span class="k">Скидка на экраны ${r.screensDisc}%</span><span class="v">−${fmt(r.scDiscSum)} ₽</span></div>`:"")+`</div>`;
+  }
+  if(r.benefit>0) h+=`<div class="sline" style="border:none"><span class="k" style="color:var(--ok);font-weight:700">🎁 Выгода клиента</span><span class="v" style="color:var(--ok)">−${fmt(r.benefit)} ₽</span></div>`;
+  $("#lines").innerHTML=h;
+  $("#total").innerHTML=`${fmt(r.total)} <small>₽</small>`;
+
+  if(r.contacts>0){
+    let mb=`<div class="mediabox"><div class="mt">Медиапоказатели</div>`;
+    if(r.standsUnits)mb+=mrow("Стендов в охвате",fmt(r.standsUnits));
+    if(r.scUnits)mb+=mrow("Экранов в охвате",fmt(r.scUnits));
+    mb+=mrow("Покупателей (жителей)",fmt(r.totalRes));
+    mb+=mrow("Медиаконтактов в месяц",fmt(r.contacts));
+    mb+=mrow("Медиаконтактов в день",fmt(r.contacts/30));
+    mb+=mrow("Стоимость 1 контакта",fmt2(r.cpc)+" ₽");
+    mb+=`</div>`;
+    $("#mediaSummary").innerHTML=mb;
+  } else $("#mediaSummary").innerHTML="";
+  function mrow(k,v){return `<div class="mrow"><span class="k">${k}</span><span>${v}</span></div>`;}
+}
+
+/* ---------- TELEGRAM ---------- */
+function tgText(){
+  const r=calc(), m=S.manager, L=[];
+  L.push("📢 *Коммерческое предложение — M-CITY*");
+  L.push("Реклама в лифтах · Красноярск");
+  if(S.client)L.push("Для: "+S.client);
+  const gl=x=>x.gift?" — 🎁 в подарок":"";
+  if(r.st.length){
+    L.push("\n🖼️ *Стенды в лифтах*");
+    r.st.forEach(x=>L.push(`• ${x.name} — ${x.fmt} — ${wStend(x.count)} — ${x.gift?'🎁 подарок':fmt(x.line)+' ₽'}`));
+    if(r.posSum)L.push("⭐ Позиционирование ("+posBreakText(r.posBreak)+"): +"+fmt(r.posSum)+" ₽");
+    if(S.standsPeriods>1)L.push("Периодов: "+S.standsPeriods+" × 30 дней");
+    if(r.standsDisc>0)L.push("Скидка на стенды "+r.standsDisc+"%: −"+fmt(r.standsDiscSum)+" ₽");
+  }
+  if(r.sc.length){
+    L.push("\n📺 *Экраны в лифтах*");
+    L.push("Интенсивность: "+CFG.intensity[S.intensity].label+"/сутки, "+S.screensMonths+" "+plural(S.screensMonths,"месяц","месяца","месяцев"));
+    r.sc.forEach(x=>L.push(`• ${x.name} — ${wScreen(x.count)} — ${x.gift?'🎁 подарок':fmt(x.line)+' ₽'}`));
+    if(r.videoCost)L.push("+ видеоролик: "+fmt(r.videoCost)+" ₽");
+    if(r.screensDisc>0)L.push("Скидка на экраны "+r.screensDisc+"%: −"+fmt(r.scDiscSum)+" ₽");
+  }
+  L.push("");
+  L.push("💰 Стоимость: "+fmt(r.base)+" ₽");
+  if(r.discSum>0)L.push("✅ Скидки: −"+fmt(r.discSum)+" ₽");
+  L.push("💎 *ИТОГО: "+fmt(r.total)+" ₽*");
+  if(r.contacts>0){
+    L.push("\n📊 Покупателей: "+fmt(r.totalRes));
+    L.push("👁️ Медиаконтактов в месяц: "+fmt(r.contacts)+" (в день: "+fmt(r.contacts/30)+")");
+    L.push("🎯 Стоимость 1 контакта: "+fmt2(r.cpc)+" ₽");
+  }
+  if(S.sfera!==""&&S.pics.size)L.push("\n📸 Примеры наших работ по сфере «"+SFERI[+S.sfera].name+"»: "+S.pics.size+" макетов (в PDF)");
+  L.push("\n🗺️ Карта размещений: "+CFG.company.map);
+  L.push("");
+  const c=[]; if(m.name)c.push(m.name); if(m.phone)c.push("📞 "+m.phone);
+  if(m.tg)c.push("✈️ "+m.tg); if(m.max)c.push("MAX: "+m.max); if(m.email)c.push("✉️ "+m.email);
+  if(c.length)L.push(c.join("  ·  "));
+  L.push(CFG.company.site);
+  return L.join("\n");
+}
+
+/* ---------- PDF ---------- */
+function buildPrint(){
+  const r=calc(), m=S.manager, today=new Date().toLocaleDateString("ru-RU"), RED="#e21f2b";
+  const sec=t=>`<div style="background:${RED};color:#fff;font-weight:800;font-size:15px;padding:8px 14px;border-radius:7px;margin:22px 0 12px">${t}</div>`;
+  const th=`background:#1b1f27;color:#fff;font-size:12px;text-align:left;padding:8px 10px`;
+  const td=`padding:8px 10px;border-bottom:1px solid #e6e8ec;font-size:13px`;
+  const mediaCard=(t,v)=>`<div style="flex:1;min-width:120px;background:#f6f8fb;border:1px solid #e2e6ec;border-radius:10px;padding:12px 14px">
+    <div style="color:#666;font-size:12px">${t}</div><div style="font-size:20px;font-weight:800;color:${RED}">${v}</div></div>`;
+
+  const stdSel=r.st.some(x=>!isSouth(x.i)), southSel=r.st.some(x=>isSouth(x.i));
+
+  let standsHtml="";
+  if(r.st.length){
+    standsHtml+=sec("Стенды в лифтах");
+    standsHtml+=`<table style="width:100%;border-collapse:collapse;margin-bottom:6px">
+      <tr><th style="${th}">Локация</th><th style="${th}">Формат</th><th style="${th};text-align:right">Покупателей</th>
+      <th style="${th};text-align:right">Контактов/мес</th><th style="${th};text-align:right">Стоимость</th></tr>`+
+      r.st.map(x=>`<tr><td style="${td}">${x.name}<br><span style="color:#888;font-size:11px">${wStend(x.count)}</span></td>
+        <td style="${td};font-weight:700">${x.fmt}${x.gift?' <span style="color:#1a9e6c">🎁</span>':''}</td>
+        <td style="${td};text-align:right">${x.res?fmt(x.res):'—'}</td>
+        <td style="${td};text-align:right">${x.res?fmt(x.contacts):'—'}</td>
+        <td style="${td};text-align:right;font-weight:700">${x.gift?'<span style="color:#1a9e6c">подарок</span>':fmt(x.line)+' ₽'}</td></tr>`).join("")+
+      (r.posSum?`<tr><td style="${td}" colspan="4">⭐ Позиционирование на плакате (${posBreakText(r.posBreak)})</td><td style="${td};text-align:right;font-weight:700">${fmt(r.posSum)} ₽</td></tr>`:"")+`</table>`;
+    if(r.giftStands>0)standsHtml+=`<div style="color:#1a9e6c;font-size:12px">🎁 Акция: ${r.giftStands} ${plural(r.giftStands,"район","района","районов")} в подарок.</div>`;
+    if(S.standsPeriods>1)standsHtml+=`<div style="color:#666;font-size:12px">Срок: ${S.standsPeriods} × 30 дней (−7 дней в подарок на период).</div>`;
+    // позиционирование (матрица) + фото «как выглядит реклама» — в один ряд, одного размера
+    const PH=190; // одинаковая высота матрицы и фото в PDF
+    const matH=svg=>svg.replace("<svg ",`<svg style="height:${PH}px;width:auto" `);
+    const blocks=[];
+    if(stdSel)blocks.push({t:'Обычные стенды',mat:S.slotsStd.size?matrixSVG('std',S.slotsStd,false):'',photo:'assets/board_stend.png'});
+    if(southSel)blocks.push({t:'Южный берег / Образцово',mat:S.slotsSouth.size?matrixSVG('south',S.slotsSouth,false):'',photo:'assets/board_south.png'});
+    blocks.forEach(b=>{
+      if(b.mat){
+        // позиционирование выбрано → матрица и фото в один ряд, одного размера
+        standsHtml+=`<div style="margin-top:14px;page-break-inside:avoid"><div style="font-weight:700;font-size:13px;margin-bottom:6px">${b.t}</div>
+          <div style="display:flex;gap:16px;align-items:flex-start;justify-content:center;flex-wrap:wrap">
+            <div style="flex:1;min-width:220px;text-align:center"><div style="font-size:11px;color:#888;margin-bottom:5px">Примерное место (позиционирование)</div>
+              <div style="height:${PH}px;display:flex;align-items:center;justify-content:center">${matH(b.mat)}</div></div>
+            <div style="flex:1;min-width:220px;text-align:center"><div style="font-size:11px;color:#888;margin-bottom:5px">Как выглядит реклама в лифте</div>
+              <div style="height:${PH}px;display:flex;align-items:center;justify-content:center"><img src="${b.photo}" style="height:${PH}px;max-width:100%;object-fit:contain;border-radius:8px;border:1px solid #ddd"></div></div>
+          </div></div>`;
+      } else {
+        // без позиционирования → фото крупнее и по центру
+        standsHtml+=`<div style="margin-top:14px;page-break-inside:avoid;text-align:center"><div style="font-weight:700;font-size:13px;margin-bottom:6px">${b.t}</div>
+          <div style="font-size:11px;color:#888;margin-bottom:5px">Как выглядит реклама в лифте</div>
+          <img src="${b.photo}" style="height:340px;max-width:100%;object-fit:contain;border-radius:8px;border:1px solid #ddd"></div>`;
+      }
+    });
+  }
+
+  let screensHtml="";
+  if(r.sc.length){
+    screensHtml+=sec("Экраны в лифтах · элитные дома");
+    screensHtml+=`<div style="color:#444;font-size:13px;margin-bottom:8px">Интенсивность: <b>${CFG.intensity[S.intensity].label} в сутки</b> · срок: <b>${S.screensMonths} ${plural(S.screensMonths,"месяц","месяца","месяцев")}</b> · ролик до 10 сек</div>`;
+    screensHtml+=`<table style="width:100%;border-collapse:collapse">
+      <tr><th style="${th}">Дом / БЦ</th><th style="${th};text-align:right">Экранов</th><th style="${th};text-align:right">Покупателей</th>
+      <th style="${th};text-align:right">Контактов/мес</th><th style="${th};text-align:right">Стоимость</th></tr>`+
+      r.sc.map(x=>`<tr><td style="${td}">${x.name}${x.gift?' <span style="color:#1a9e6c">🎁</span>':''}</td><td style="${td};text-align:right">${x.count}</td>
+        <td style="${td};text-align:right">${x.res?fmt(x.res):'—'}</td>
+        <td style="${td};text-align:right">${x.res?fmt(x.contacts):'—'}</td>
+        <td style="${td};text-align:right;font-weight:700">${x.gift?'<span style="color:#1a9e6c">подарок</span>':fmt(x.line)+' ₽'}</td></tr>`).join("")+
+      (r.videoCost?`<tr><td style="${td}" colspan="4">Разработка видеоролика${S.videoFix>0?' + '+S.videoFix+' корректировки':''}</td><td style="${td};text-align:right;font-weight:700">${fmt(r.videoCost)} ₽</td></tr>`:"")+`</table>`;
+    if(r.giftScreens>0)screensHtml+=`<div style="color:#1a9e6c;font-size:12px;margin-top:4px">🎁 Акция: ${r.giftScreens} ${plural(r.giftScreens,"объект","объекта","объектов")} в подарок.</div>`;
+    screensHtml+=`<div style="margin-top:12px;text-align:center"><img src="assets/screen.png" style="max-height:360px;max-width:60%;border-radius:8px;border:1px solid #ddd">
+      <div style="color:#888;font-size:11px;margin-top:4px">Экран 21,5″ Full HD в лифте элитного дома</div></div>`;
+  }
+
+  const totalHtml=`${sec("Стоимость и эффективность")}
+    <table style="width:100%;border-collapse:collapse;font-size:15px">
+      <tr><td style="${td}">Стоимость размещения</td><td style="${td};text-align:right">${fmt(r.base)} ₽</td></tr>
+      ${r.standsDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на стенды ${r.standsDisc}%</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.standsDiscSum)} ₽</td></tr>`:""}
+      ${r.scDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на экраны ${r.screensDisc}%</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.scDiscSum)} ₽</td></tr>`:""}
+      <tr><td style="padding:12px 10px;border-top:2px solid #111;font-size:20px;font-weight:800">ИТОГО</td>
+      <td style="padding:12px 10px;border-top:2px solid #111;font-size:20px;font-weight:800;text-align:right;color:${RED}">${fmt(r.total)} ₽</td></tr>
+    </table>
+    ${r.benefit>0?`<div style="margin-top:14px;background:#eafaf2;border:1px solid #9fe3c4;border-radius:10px;padding:14px 16px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+      <div style="flex:1;min-width:140px"><div style="color:#666;font-size:12px">Цена без акций и скидок</div>
+        <div style="font-size:18px;font-weight:700;color:#999;text-decoration:line-through">${fmt(r.fullNoPromo)} ₽</div></div>
+      <div style="flex:1;min-width:120px"><div style="color:#666;font-size:12px">Ваша цена</div>
+        <div style="font-size:18px;font-weight:800">${fmt(r.total)} ₽</div></div>
+      <div style="flex:1;min-width:140px;text-align:right"><div style="color:#1a9e6c;font-size:12px;font-weight:700">ВАША ВЫГОДА</div>
+        <div style="font-size:24px;font-weight:900;color:#1a9e6c">−${fmt(r.benefit)} ₽</div></div>
+    </div>${(r.giftStands+r.giftScreens)>0?`<div style="color:#1a9e6c;font-size:12px;margin-top:6px">🎁 В выгоду входят бесплатные размещения по акции${(r.standsDiscSum+r.scDiscSum)>0?' и скидки':''}.</div>`:""}`:""}
+    ${r.contacts>0?`<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+      ${mediaCard("Медиаконтактов в месяц",fmt(r.contacts))}
+      ${mediaCard("Медиаконтактов в день",fmt(r.contacts/30))}
+      ${mediaCard("Покупателей (всего)",fmt(r.totalRes))}
+      ${mediaCard("Стоимость 1 контакта",fmt2(r.cpc)+" ₽")}
+    </div><div style="color:#888;font-size:11px;margin-top:8px">Медиаконтакт — один контакт жителя с рекламой. Каждый житель пользуется лифтом минимум 2 раза в день (×60 в месяц).</div>`:""}`;
+
+  let picsHtml="";
+  if(S.sfera!==""&&S.pics.size){const sf=SFERI[+S.sfera];
+    picsHtml+=sec("Примеры наших работ · "+sf.name);
+    picsHtml+=`<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">`+
+      [...S.pics].map(idx=>`<img src="${sf.imgs[idx]}" style="width:92mm;height:130mm;object-fit:contain;background:#fff;border:1px solid #ddd;border-radius:6px;page-break-inside:avoid">`).join("")+`</div>`;
+  }
+
+  $("#printArea").innerHTML=`<div style="font-family:Arial,sans-serif;color:#111;max-width:760px;margin:0 auto;padding:6px">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:4px solid ${RED};padding-bottom:14px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:52px;height:52px;border:3px solid ${RED};border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px">M<span style="color:${RED}">·</span>CITY</div>
+        <div><div style="font-size:24px;font-weight:900">Коммерческое предложение</div>
+        <div style="color:#666;font-size:13px">Реклама в лифтах · Красноярск · ${today}</div></div>
+      </div>
+    </div>
+    ${S.client?`<div style="margin-top:14px;font-size:15px">Для: <b>${S.client}</b></div>`:""}
+    ${standsHtml}${screensHtml}${totalHtml}${picsHtml}
+    <div style="margin-top:18px;color:#999;font-size:11px;border-top:1px solid #eee;padding-top:10px">
+      Предложение носит информационный характер и не является публичной офертой. Цены действительны на ${today}.</div>
+  </div>`;
+}
+
+/* ---------- Тосты ---------- */
+let tT; function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(tT);tT=setTimeout(()=>t.classList.remove("show"),1800);}
+
+/* ---------- СОБЫТИЯ ---------- */
+function bind(){
+  $$('[data-card]').forEach(h=>h.addEventListener("click",e=>{
+    if(e.target.closest("input,select,button,.it,.thumb,.opt,.fmtbtn,.check,.cell,svg"))return;
+    const id=h.dataset.card, cap=id.charAt(0).toUpperCase()+id.slice(1);
+    const bd=$("#bd"+cap), tg=$("#tg"+cap);
+    const open=bd.style.display!=="none"; bd.style.display=open?"none":"";
+    if(tg)tg.textContent=open?"развернуть ▼":"свернуть ▲";
+  }));
+
+  // стенды
+  $("#standsList").addEventListener("click",e=>{
+    const fb=e.target.closest("[data-fmtfor]");
+    if(fb){const i=+fb.dataset.fmtfor,f=+fb.dataset.f; if(DATA.stands[i].p[f]==null)return;
+      S.stands.set(i,f); renderStands($("#standsSearch").value); render(); return;}
+    const gb=e.target.closest("[data-giftstand]");
+    if(gb){const i=+gb.dataset.giftstand; S.standsGifts.has(i)?S.standsGifts.delete(i):S.standsGifts.add(i);
+      renderStands($("#standsSearch").value); render(); return;}
+    const head=e.target.closest(".head");
+    if(head){const i=+head.closest("[data-stand]").dataset.stand;
+      if(S.stands.has(i)){S.stands.delete(i);S.standsGifts.delete(i);}
+      else{const def=DATA.stands[i].p[2]!=null?2:(DATA.stands[i].p[3]!=null?3:0);S.stands.set(i,def);}
+      renderStands($("#standsSearch").value);render();}
+  });
+  $("#standsSearch").addEventListener("input",e=>renderStands(e.target.value));
+
+  // матрица места
+  $("#matrixBox").addEventListener("click",e=>{const c=e.target.closest("[data-slotfor]");if(!c)return;
+    const k=c.dataset.slotfor,s=+c.dataset.slot;
+    const set=k==="std"?S.slotsStd:S.slotsSouth;
+    set.has(s)?set.delete(s):set.add(s);
+    renderPlace();render();});
+
+  // позиционирование
+  $("#posCheck").addEventListener("click",()=>{S.posAll=!S.posAll;render();});
+
+  // интенсивность
+  $("#intensity").addEventListener("click",e=>{const o=e.target.closest("[data-int]");if(!o)return;
+    S.intensity=+o.dataset.int;$$("[data-int]").forEach(x=>x.classList.toggle("sel",x===o));
+    renderScreens($("#screensSearch").value);render();});
+  // экраны
+  $("#screensList").addEventListener("click",e=>{
+    const gb=e.target.closest("[data-giftscreen]");
+    if(gb){const k=gb.dataset.giftscreen;S.screensGifts.has(k)?S.screensGifts.delete(k):S.screensGifts.add(k);
+      renderScreens($("#screensSearch").value);render();return;}
+    const head=e.target.closest(".head");if(!head)return;
+    const k=head.closest("[data-screen]").dataset.screen;
+    if(S.screens.has(k)){S.screens.delete(k);S.screensGifts.delete(k);}else S.screens.add(k);
+    renderScreens($("#screensSearch").value);render();});
+  $("#screensSearch").addEventListener("input",e=>renderScreens(e.target.value));
+
+  // действия
+  document.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b)return;
+    const a=b.dataset.act;
+    if(a==="clear-stands"){S.stands.clear();S.standsGifts.clear();S.slotsStd.clear();S.slotsSouth.clear();renderStands($("#standsSearch").value);}
+    if(a==="clear-screens"){S.screens.clear();S.screensGifts.clear();renderScreens($("#screensSearch").value);}
+    if(a==="pics-all"&&S.sfera!==""){SFERI[+S.sfera].imgs.forEach((_,i)=>S.pics.add(i));renderThumbs();}
+    if(a==="pics-none"){S.pics.clear();renderThumbs();}
+    render();});
+
+  // степперы
+  document.addEventListener("click",e=>{const b=e.target.closest("[data-step]");if(!b)return;
+    const[id,d]=b.dataset.step.split(",");const inp=$("#"+id);const min=id==="videoFix"?0:1;
+    let v=Math.max(min,(+inp.value||0)+(+d));inp.value=v;S[id]=v;render();});
+  ["standsPeriods","screensMonths","videoFix"].forEach(id=>$("#"+id).addEventListener("input",e=>{
+    S[id]=Math.max(id==="videoFix"?0:1,+e.target.value||0);render();}));
+
+  $("#videoCheck").addEventListener("click",()=>{S.video=!S.video;$("#videoCheck").classList.toggle("sel",S.video);render();});
+
+  $("#sfera").addEventListener("change",e=>{S.sfera=e.target.value;S.pics.clear();renderThumbs();render();});
+  $("#thumbs").addEventListener("click",e=>{const t=e.target.closest("[data-pic]");if(!t)return;
+    const idx=+t.dataset.pic;S.pics.has(idx)?S.pics.delete(idx):S.pics.add(idx);renderThumbs();});
+
+  $("#discStands").addEventListener("input",e=>{S.standsDiscount=+e.target.value||0;render();});
+  $("#discScreens").addEventListener("input",e=>{S.screensDiscount=+e.target.value||0;render();});
+
+  $("#btnPdf").addEventListener("click",()=>{if(!S.stands.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
+    buildPrint();
+    const oldTitle=document.title; document.title=" ";   // убираем «M-CITY · Калькулятор…» из колонтитула печати
+    setTimeout(()=>{window.print(); document.title=oldTitle;},60);});
+  $("#btnTg").addEventListener("click",async()=>{if(!S.stands.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
+    const txt=tgText();
+    try{await navigator.clipboard.writeText(txt);toast("Скопировано ✓");}
+    catch(_){const ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();
+      document.execCommand("copy");ta.remove();toast("Скопировано ✓");}});
+}
+
+buildUI(); bind(); render();
+</script>
+</body>
+</html>
