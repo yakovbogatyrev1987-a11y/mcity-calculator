@@ -534,15 +534,24 @@ function tgText(){
     if(r.screensDisc>0)L.push("Скидка на экраны "+r.screensDisc+"%: −"+fmt(r.scDiscSum)+" ₽");
   }
   L.push("");
-  L.push("💰 Стоимость: "+fmt(r.base)+" ₽");
-  if(r.discSum>0)L.push("✅ Скидки: −"+fmt(r.discSum)+" ₽");
-  L.push("💎 *ИТОГО: "+fmt(r.total)+" ₽*");
+  if(r.benefit>0){
+    L.push("💰 Цена без акций и скидок: "+fmt(r.fullNoPromo)+" ₽");
+    L.push("💎 *Ваша цена: "+fmt(r.total)+" ₽*");
+    L.push("🎁 *ВАША ВЫГОДА: "+fmt(r.benefit)+" ₽*");
+  } else {
+    L.push("💎 *ИТОГО: "+fmt(r.total)+" ₽*");
+  }
   if(r.contacts>0){
     L.push("\n📊 Покупателей: "+fmt(r.totalRes));
     L.push("👁️ Медиаконтактов в месяц: "+fmt(r.contacts)+" (в день: "+fmt(r.contacts/30)+")");
     L.push("🎯 Стоимость 1 контакта: "+fmt2(r.cpc)+" ₽");
   }
-  if(S.sfera!==""&&S.pics.size)L.push("\n📸 Примеры наших работ по сфере «"+SFERI[+S.sfera].name+"»: "+S.pics.size+" макетов (в PDF)");
+  if(S.sfera!==""&&S.pics.size){
+    const sf=SFERI[+S.sfera];
+    const base=location.protocol==="file:"?"":location.href.replace(/[?#].*$/,"").replace(/[^/]*$/,"");
+    L.push("\n📸 Примеры наших работ («"+sf.name+"»):");
+    [...S.pics].forEach(idx=>L.push(base+sf.imgs[idx]));
+  }
   L.push("\n🗺️ Карта размещений: "+CFG.company.map);
   L.push("");
   const c=[]; if(m.name)c.push(m.name); if(m.phone)c.push("📞 "+m.phone);
