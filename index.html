@@ -746,7 +746,9 @@ function bind(){
   $("#btnPdf").addEventListener("click",()=>{if(!S.stands.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
     buildPrint();
     const oldTitle=document.title; document.title=" ";   // убираем «M-CITY · Калькулятор…» из колонтитула печати
-    setTimeout(()=>{window.print(); document.title=oldTitle;},60);});
+    const imgs=[...document.querySelectorAll("#printArea img")];
+    const ready=Promise.all(imgs.map(im=>im.complete&&im.naturalWidth?Promise.resolve():new Promise(res=>{im.onload=im.onerror=res;})));
+    Promise.race([ready,new Promise(r=>setTimeout(r,6000))]).then(()=>{window.print(); document.title=oldTitle;});});
   $("#btnTg").addEventListener("click",async()=>{if(!S.stands.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
     const txt=tgText();
     try{await navigator.clipboard.writeText(txt);toast("Скопировано ✓");}
