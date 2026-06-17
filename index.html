@@ -504,8 +504,8 @@ function render(){
     if(r.standsUnits)mb+=mrow("Стендов в охвате",fmt(r.standsUnits));
     if(r.scUnits)mb+=mrow("Экранов в охвате",fmt(r.scUnits));
     mb+=mrow("Покупателей (жителей)",fmt(r.totalRes));
-    mb+=mrow("Медиаконтактов в месяц",fmt(r.contacts));
-    mb+=mrow("Медиаконтактов в день",fmt(r.contacts/30));
+    mb+=mrow("Зрительных контактов в месяц",fmt(r.contacts));
+    mb+=mrow("Зрительных контактов в день",fmt(r.contacts/30));
     mb+=mrow("Стоимость 1 контакта",fmt2(r.cpc)+" ₽");
     mb+=`</div>`;
     $("#mediaSummary").innerHTML=mb;
@@ -559,7 +559,7 @@ function tgText(){
   }
   if(r.contacts>0){
     L.push("\n📊 Покупателей: "+fmt(r.totalRes));
-    L.push("👁️ Медиаконтактов в месяц: "+fmt(r.contacts)+" (в день: "+fmt(r.contacts/30)+")");
+    L.push("👁️ Зрительных контактов в месяц: "+fmt(r.contacts)+" (в день: "+fmt(r.contacts/30)+")");
     L.push("🎯 Стоимость 1 контакта: "+fmt2(r.cpc)+" ₽");
   }
   if(S.sfera!==""&&S.pics.size){
@@ -670,11 +670,11 @@ function buildPrint(){
         <div style="font-size:24px;font-weight:900;color:#1a9e6c">−${fmt(r.benefit)} ₽</div></div>
     </div>${(r.giftStands+r.giftScreens)>0?`<div style="color:#1a9e6c;font-size:12px;margin-top:6px">🎁 В выгоду входят бесплатные размещения по акции${(r.standsDiscSum+r.scDiscSum)>0?' и скидки':''}.</div>`:""}`:""}
     ${r.contacts>0?`<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
-      ${mediaCard("Медиаконтактов в месяц",fmt(r.contacts))}
-      ${mediaCard("Медиаконтактов в день",fmt(r.contacts/30))}
+      ${mediaCard("Зрительных контактов в месяц",fmt(r.contacts))}
+      ${mediaCard("Зрительных контактов в день",fmt(r.contacts/30))}
       ${mediaCard("Покупателей (всего)",fmt(r.totalRes))}
       ${mediaCard("Стоимость 1 контакта",fmt2(r.cpc)+" ₽")}
-    </div><div style="color:#888;font-size:11px;margin-top:8px">Медиаконтакт — один контакт жителя с рекламой. Каждый житель пользуется лифтом минимум 2 раза в день (×60 в месяц).</div>`:""}`;
+    </div><div style="color:#888;font-size:11px;margin-top:8px">Зрительный контакт — один контакт жителя с рекламой. Каждый житель пользуется лифтом минимум 2 раза в день (×60 в месяц).</div>`:""}`;
 
   let picsHtml="";
   if(S.sfera!==""&&S.pics.size){const sf=SFERI[+S.sfera];
