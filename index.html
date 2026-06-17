@@ -590,6 +590,10 @@ function buildPrint(){
   const priceCell=(val,disc)=> disc>0
     ? `<span style="color:#9aa0a8;font-weight:400;text-decoration:line-through">${fmt(val)} ₽</span> <span style="color:${RED};font-weight:800">${fmt(val*(1-disc/100))} ₽</span>`
     : `${fmt(val)} ₽`;
+  // ячейка подарка: зачёркнутая полная цена + «подарок»
+  const giftCell=full=> full>0
+    ? `<span style="color:#9aa0a8;font-weight:400;text-decoration:line-through">${fmt(full)} ₽</span> <span style="color:#1a9e6c;font-weight:700">подарок</span>`
+    : `<span style="color:#1a9e6c;font-weight:700">подарок</span>`;
 
   const stdSel=r.st.some(x=>!isSouth(x.i)), southSel=r.st.some(x=>isSouth(x.i));
 
@@ -603,7 +607,7 @@ function buildPrint(){
         <td style="${td};font-weight:700">${x.fmt}${x.gift?' <span style="color:#1a9e6c">🎁</span>':''}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.res):'—'}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.contacts):'—'}</td>
-        <td style="${td};text-align:right;font-weight:700">${x.gift?'<span style="color:#1a9e6c">подарок</span>':priceCell(x.line,dS)}</td></tr>`).join("")+
+        <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,dS)}</td></tr>`).join("")+
       (r.posSum?`<tr><td style="${td}" colspan="4">⭐ Позиционирование на плакате (${posBreakText(r.posBreak)})</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.posSum,dS)}</td></tr>`:"")+`</table>`;
     if(r.giftStands>0)standsHtml+=`<div style="color:#1a9e6c;font-size:12px">🎁 Акция: ${r.giftStands} ${plural(r.giftStands,"район","района","районов")} в подарок.</div>`;
     if(S.standsPeriods>1)standsHtml+=`<div style="color:#666;font-size:12px">Срок: ${S.standsPeriods} × 30 дней (−7 дней в подарок на период).</div>`;
@@ -642,7 +646,7 @@ function buildPrint(){
       r.sc.map(x=>`<tr><td style="${td}">${x.name}${x.gift?' <span style="color:#1a9e6c">🎁</span>':''}</td><td style="${td};text-align:right">${x.count}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.res):'—'}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.contacts):'—'}</td>
-        <td style="${td};text-align:right;font-weight:700">${x.gift?'<span style="color:#1a9e6c">подарок</span>':priceCell(x.line,dC)}</td></tr>`).join("")+
+        <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,dC)}</td></tr>`).join("")+
       (r.videoCost?`<tr><td style="${td}" colspan="4">Разработка видеоролика${S.videoFix>0?' + '+S.videoFix+' корректировки':''}</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.videoCost,dC)}</td></tr>`:"")+`</table>`;
     if(r.giftScreens>0)screensHtml+=`<div style="color:#1a9e6c;font-size:12px;margin-top:4px">🎁 Акция: ${r.giftScreens} ${plural(r.giftScreens,"объект","объекта","объектов")} в подарок.</div>`;
     screensHtml+=`<div style="margin-top:12px;text-align:center"><img src="assets/screen.png" style="max-height:360px;max-width:60%;border-radius:8px;border:1px solid #ddd">
@@ -716,42 +720,63 @@ function svgToPng(svg,scale){
     img.onerror=()=>res(null); img.src=url;
   });
 }
-// flex-контейнеры → таблицы (Word не понимает flexbox)
+// flex-контейнеры → таблицы (Word не понимает flexbox); широкие ряды с картинками бьём по 2
 function flexToTables(root){
   let guard=0;
-  while(guard++<300){
+  while(guard++<400){
     const el=[...root.querySelectorAll("*")].find(e=>e.style && e.style.display==="flex");
     if(!el)break;
     const kids=[...el.children];
+    const hasImg=kids.some(k=>k.querySelector && k.querySelector("img"));
+    const wrap=el.style.flexWrap==="wrap";
+    const perRow=(hasImg && wrap && kids.length>2)?2:kids.length;
     const tbl=document.createElement("table");
-    tbl.setAttribute("style","width:100%;border-collapse:collapse;margin:0");
-    const tr=document.createElement("tr");
-    kids.forEach(c=>{
-      const tdcell=document.createElement("td");
-      const ta=(c.style.textAlign||"left");
-      tdcell.setAttribute("style","vertical-align:top;padding:0 6px;text-align:"+ta);
-      tdcell.appendChild(c);
-      tr.appendChild(tdcell);
-    });
-    tbl.appendChild(tr);
+    tbl.setAttribute("style","border-collapse:collapse;margin:0 auto");
+    for(let i=0;i<kids.length;i+=perRow){
+      const tr=document.createElement("tr");
+      kids.slice(i,i+perRow).forEach(c=>{
+        const tdcell=document.createElement("td");
+        const ta=(c.style.textAlign||"left");
+        tdcell.setAttribute("style","vertical-align:top;padding:4px 8px;text-align:"+ta);
+        tdcell.appendChild(c);
+        tr.appendChild(tdcell);
+      });
+      tbl.appendChild(tr);
+    }
     el.replaceWith(tbl);
   }
 }
+// размер картинки в px под страницу (Word уважает атрибуты width/height)
+function sizeImg(im,nw,nh,boxW,boxH){
+  if(!nw||!nh){nw=4;nh=3;}
+  let w=boxW, h=Math.round(w*nh/nw);
+  if(h>boxH){h=boxH; w=Math.round(h*nw/nh);}
+  im.setAttribute("width",w); im.setAttribute("height",h);
+  im.setAttribute("style","width:"+w+"px;height:"+h+"px;border-radius:8px;border:1px solid #ddd");
+}
 async function exportWord(){
+  // натуральные размеры фото берём из уже загруженного #printArea (в клоне их нет)
+  const liveDims=[...document.querySelectorAll("#printArea img")].map(im=>({nw:im.naturalWidth,nh:im.naturalHeight}));
   const tmp=document.createElement("div");
   tmp.innerHTML=$("#printArea").innerHTML;
-  // SVG → PNG
+  // фото → base64 + размер под страницу. Порядок img в клоне совпадает с #printArea
+  const photos=[...tmp.querySelectorAll("img")];
+  for(let i=0;i<photos.length;i++){
+    const im=photos[i], d=liveDims[i]||{};
+    if(im.src && !im.src.startsWith("data:")) im.src=await urlToDataURL(im.src);
+    const sty=im.getAttribute("style")||"";
+    const paired=/height:190px/.test(sty);         // фото в паре с матрицей
+    if(paired) sizeImg(im,d.nw,d.nh,300,210);        // в один ряд с матрицей
+    else        sizeImg(im,d.nw,d.nh,440,300);       // одиночное фото — помещаем на страницу
+  }
+  // матрица SVG → PNG, тем же размером что парное фото
   for(const svg of [...tmp.querySelectorAll("svg")]){
     const png=await svgToPng(svg,2);
     if(png){const im=document.createElement("img");
-      im.src=png.data; im.setAttribute("style","height:190px;width:auto;max-width:100%");
+      im.src=png.data; sizeImg(im,png.w,png.h,300,210);
       svg.replaceWith(im);}
     else svg.remove();
   }
-  // <img> → base64
-  await Promise.all([...tmp.querySelectorAll("img")].map(async im=>{
-    if(im.src && !im.src.startsWith("data:")) im.src=await urlToDataURL(im.src);
-  }));
   // flex → таблицы
   flexToTables(tmp);
   const head='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'+
