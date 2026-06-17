@@ -272,6 +272,7 @@
         <div id="mediaSummary"></div>
         <div class="btns">
           <button class="btn primary" id="btnPdf">📄 Скачать PDF (КП)</button>
+          <button class="btn primary" id="btnWord">📝 Скачать Word (КП)</button>
           <button class="btn ghost" id="btnTg">📋 Скопировать для Telegram</button>
         </div>
       </div>
@@ -584,6 +585,11 @@ function buildPrint(){
   const td=`padding:8px 10px;border-bottom:1px solid #e6e8ec;font-size:13px`;
   const mediaCard=(t,v)=>`<div style="flex:1;min-width:120px;background:#f6f8fb;border:1px solid #e2e6ec;border-radius:10px;padding:12px 14px">
     <div style="color:#666;font-size:12px">${t}</div><div style="font-size:20px;font-weight:800;color:${RED}">${v}</div></div>`;
+  const dS=r.standsDisc||0, dC=r.screensDisc||0;
+  // ячейка цены: при скидке показываем старую цену (зачёркнута) и новую рядом
+  const priceCell=(val,disc)=> disc>0
+    ? `<span style="color:#9aa0a8;font-weight:400;text-decoration:line-through">${fmt(val)} ₽</span> <span style="color:${RED};font-weight:800">${fmt(val*(1-disc/100))} ₽</span>`
+    : `${fmt(val)} ₽`;
 
   const stdSel=r.st.some(x=>!isSouth(x.i)), southSel=r.st.some(x=>isSouth(x.i));
 
@@ -597,8 +603,8 @@ function buildPrint(){
         <td style="${td};font-weight:700">${x.fmt}${x.gift?' <span style="color:#1a9e6c">🎁</span>':''}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.res):'—'}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.contacts):'—'}</td>
-        <td style="${td};text-align:right;font-weight:700">${x.gift?'<span style="color:#1a9e6c">подарок</span>':fmt(x.line)+' ₽'}</td></tr>`).join("")+
-      (r.posSum?`<tr><td style="${td}" colspan="4">⭐ Позиционирование на плакате (${posBreakText(r.posBreak)})</td><td style="${td};text-align:right;font-weight:700">${fmt(r.posSum)} ₽</td></tr>`:"")+`</table>`;
+        <td style="${td};text-align:right;font-weight:700">${x.gift?'<span style="color:#1a9e6c">подарок</span>':priceCell(x.line,dS)}</td></tr>`).join("")+
+      (r.posSum?`<tr><td style="${td}" colspan="4">⭐ Позиционирование на плакате (${posBreakText(r.posBreak)})</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.posSum,dS)}</td></tr>`:"")+`</table>`;
     if(r.giftStands>0)standsHtml+=`<div style="color:#1a9e6c;font-size:12px">🎁 Акция: ${r.giftStands} ${plural(r.giftStands,"район","района","районов")} в подарок.</div>`;
     if(S.standsPeriods>1)standsHtml+=`<div style="color:#666;font-size:12px">Срок: ${S.standsPeriods} × 30 дней (−7 дней в подарок на период).</div>`;
     // позиционирование (матрица) + фото «как выглядит реклама» — в один ряд, одного размера
@@ -636,8 +642,8 @@ function buildPrint(){
       r.sc.map(x=>`<tr><td style="${td}">${x.name}${x.gift?' <span style="color:#1a9e6c">🎁</span>':''}</td><td style="${td};text-align:right">${x.count}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.res):'—'}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.contacts):'—'}</td>
-        <td style="${td};text-align:right;font-weight:700">${x.gift?'<span style="color:#1a9e6c">подарок</span>':fmt(x.line)+' ₽'}</td></tr>`).join("")+
-      (r.videoCost?`<tr><td style="${td}" colspan="4">Разработка видеоролика${S.videoFix>0?' + '+S.videoFix+' корректировки':''}</td><td style="${td};text-align:right;font-weight:700">${fmt(r.videoCost)} ₽</td></tr>`:"")+`</table>`;
+        <td style="${td};text-align:right;font-weight:700">${x.gift?'<span style="color:#1a9e6c">подарок</span>':priceCell(x.line,dC)}</td></tr>`).join("")+
+      (r.videoCost?`<tr><td style="${td}" colspan="4">Разработка видеоролика${S.videoFix>0?' + '+S.videoFix+' корректировки':''}</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.videoCost,dC)}</td></tr>`:"")+`</table>`;
     if(r.giftScreens>0)screensHtml+=`<div style="color:#1a9e6c;font-size:12px;margin-top:4px">🎁 Акция: ${r.giftScreens} ${plural(r.giftScreens,"объект","объекта","объектов")} в подарок.</div>`;
     screensHtml+=`<div style="margin-top:12px;text-align:center"><img src="assets/screen.png" style="max-height:360px;max-width:60%;border-radius:8px;border:1px solid #ddd">
       <div style="color:#888;font-size:11px;margin-top:4px">Экран 21,5″ Full HD в лифте элитного дома</div></div>`;
@@ -686,6 +692,81 @@ function buildPrint(){
     <div style="margin-top:18px;color:#999;font-size:11px;border-top:1px solid #eee;padding-top:10px">
       Предложение носит информационный характер и не является публичной офертой. Цены действительны на ${today}.</div>
   </div>`;
+}
+
+/* ---------- WORD ---------- */
+// картинка по URL → data:base64 (сохраняем оригинал, без перекодирования)
+function urlToDataURL(url){
+  return fetch(url).then(r=>r.blob()).then(b=>new Promise(res=>{
+    const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=()=>res(url); fr.readAsDataURL(b);
+  })).catch(()=>url);
+}
+// inline-SVG → PNG data:base64 (Word не рендерит SVG, поэтому растрируем)
+function svgToPng(svg,scale){
+  return new Promise(res=>{
+    const vb=(svg.getAttribute("viewBox")||"0 0 600 200").split(/\s+/).map(Number);
+    const w=vb[2]||600, h=vb[3]||200, s=scale||2;
+    const xml=new XMLSerializer().serializeToString(svg);
+    const url="data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(xml)));
+    const img=new Image();
+    img.onload=()=>{const c=document.createElement("canvas");c.width=w*s;c.height=h*s;
+      const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);
+      ctx.drawImage(img,0,0,c.width,c.height);
+      try{res({data:c.toDataURL("image/png"),w,h});}catch(_){res(null);}};
+    img.onerror=()=>res(null); img.src=url;
+  });
+}
+// flex-контейнеры → таблицы (Word не понимает flexbox)
+function flexToTables(root){
+  let guard=0;
+  while(guard++<300){
+    const el=[...root.querySelectorAll("*")].find(e=>e.style && e.style.display==="flex");
+    if(!el)break;
+    const kids=[...el.children];
+    const tbl=document.createElement("table");
+    tbl.setAttribute("style","width:100%;border-collapse:collapse;margin:0");
+    const tr=document.createElement("tr");
+    kids.forEach(c=>{
+      const tdcell=document.createElement("td");
+      const ta=(c.style.textAlign||"left");
+      tdcell.setAttribute("style","vertical-align:top;padding:0 6px;text-align:"+ta);
+      tdcell.appendChild(c);
+      tr.appendChild(tdcell);
+    });
+    tbl.appendChild(tr);
+    el.replaceWith(tbl);
+  }
+}
+async function exportWord(){
+  const tmp=document.createElement("div");
+  tmp.innerHTML=$("#printArea").innerHTML;
+  // SVG → PNG
+  for(const svg of [...tmp.querySelectorAll("svg")]){
+    const png=await svgToPng(svg,2);
+    if(png){const im=document.createElement("img");
+      im.src=png.data; im.setAttribute("style","height:190px;width:auto;max-width:100%");
+      svg.replaceWith(im);}
+    else svg.remove();
+  }
+  // <img> → base64
+  await Promise.all([...tmp.querySelectorAll("img")].map(async im=>{
+    if(im.src && !im.src.startsWith("data:")) im.src=await urlToDataURL(im.src);
+  }));
+  // flex → таблицы
+  flexToTables(tmp);
+  const head='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'+
+    '<head><meta charset="utf-8"><title>Коммерческое предложение</title>'+
+    '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->'+
+    '<style>@page{size:A4;margin:1.2cm} body{font-family:Arial,sans-serif} table{border-collapse:collapse} img{max-width:100%}</style>'+
+    '</head><body>';
+  const html=head+tmp.innerHTML+"</body></html>";
+  const blob=new Blob(["﻿"+html],{type:"application/msword"});
+  const today=new Date().toLocaleDateString("ru-RU").replace(/\./g,"-");
+  const name="КП M-CITY"+(S.client?" "+S.client:"")+" "+today+".doc";
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1500);
 }
 
 /* ---------- Тосты ---------- */
@@ -773,6 +854,11 @@ function bind(){
     const imgs=[...document.querySelectorAll("#printArea img")];
     const ready=Promise.all(imgs.map(im=>im.complete&&im.naturalWidth?Promise.resolve():new Promise(res=>{im.onload=im.onerror=res;})));
     Promise.race([ready,new Promise(r=>setTimeout(r,6000))]).then(()=>{window.print(); document.title=oldTitle;});});
+  $("#btnWord").addEventListener("click",()=>{if(!S.stands.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
+    toast("Готовлю Word…"); buildPrint();
+    const imgs=[...document.querySelectorAll("#printArea img")];
+    const ready=Promise.all(imgs.map(im=>im.complete&&im.naturalWidth?Promise.resolve():new Promise(res=>{im.onload=im.onerror=res;})));
+    Promise.race([ready,new Promise(r=>setTimeout(r,8000))]).then(()=>exportWord().then(()=>toast("Word скачан ✓")).catch(()=>toast("Не удалось собрать Word")));});
   $("#btnTg").addEventListener("click",async()=>{if(!S.stands.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
     const txt=tgText();
     try{await navigator.clipboard.writeText(txt);toast("Скопировано ✓");}
