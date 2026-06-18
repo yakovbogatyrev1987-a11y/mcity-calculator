@@ -526,6 +526,10 @@ function tgText(){
     const body=rows.map(rw=>rw.map((v,c)=>c===cols-1?padL(v,w[c]):padR(v,w[c])).join("  ")).join("\n");
     return "```\n"+body+"\n```";
   };
+  // цена для Telegram: было → стало (скидка) / полная → подарок. Зачёркивания нет в моноблоке, поэтому стрелкой
+  const tgPrice=(x,disc)=> x.gift
+    ? (x.full>0 ? fmt(x.full)+" ₽ → подарок" : "подарок")
+    : (disc>0 ? fmt(x.line)+" → "+fmt(x.line*(1-disc/100))+" ₽" : fmt(x.line)+" ₽");
 
   L.push("📢 Коммерческое предложение — M-CITY");
   L.push("Реклама в лифтах · Красноярск");
@@ -533,7 +537,7 @@ function tgText(){
 
   if(r.st.length){
     L.push("\n🖼️ Стенды в лифтах");
-    L.push(table(r.st.map(x=>[x.name, x.fmt, wStend(x.count), x.gift?"подарок":fmt(x.line)+" ₽"])));
+    L.push(table(r.st.map(x=>[x.name, x.fmt, wStend(x.count), tgPrice(x,r.standsDisc)])));
     if(r.posSum)L.push("⭐ Позиционирование ("+posBreakText(r.posBreak)+"): +"+fmt(r.posSum)+" ₽");
     if(S.standsPeriods>1)L.push("Срок: "+S.standsPeriods+" × 30 дней");
     if(r.standsDisc>0)L.push("Скидка на стенды "+r.standsDisc+"%: −"+fmt(r.standsDiscSum)+" ₽");
@@ -541,7 +545,7 @@ function tgText(){
   if(r.sc.length){
     L.push("\n📺 Экраны в лифтах");
     L.push("Интенсивность: "+CFG.intensity[S.intensity].label+"/сутки, "+S.screensMonths+" "+plural(S.screensMonths,"месяц","месяца","месяцев"));
-    L.push(table(r.sc.map(x=>[x.name, wScreen(x.count), x.gift?"подарок":fmt(x.line)+" ₽"])));
+    L.push(table(r.sc.map(x=>[x.name, wScreen(x.count), tgPrice(x,r.screensDisc)])));
     if(r.videoCost)L.push("+ видеоролик: "+fmt(r.videoCost)+" ₽");
     if(r.screensDisc>0)L.push("Скидка на экраны "+r.screensDisc+"%: −"+fmt(r.scDiscSum)+" ₽");
   }
