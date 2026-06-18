@@ -540,14 +540,16 @@ function tgText(){
     for(let c=0;c<cols;c++) if(rows.some(rw=>String(rw[c]).trim()!=="")) keep.push(c);
     const w={}; keep.forEach(c=>w[c]=Math.max(...rows.map(rw=>String(rw[c]).length)));
     const body=rows.map(rw=>keep.map(c=>{
-      const v=String(rw[c]); return aligns[c]==="R"?padL(v,w[c]):padR(v,w[c]);
+      const v=String(rw[c]);
+      if(v==="" && aligns[c]==="R" && w[c]>2) return " "+"–".repeat(w[c]-2)+" ";  // тире-лидер вместо пустоты
+      return aligns[c]==="R"?padL(v,w[c]):padR(v,w[c]);
     }).join("  ").replace(/\s+$/,"")).join("\n");
     return "```\n"+body+"\n```";
   };
   // цена → 3 колонки: [было →] [итог] [скидка]. Итог («25 904 ₽» / «подарок») в общей колонке
   const priceTriple=(x,disc)=> x.gift
     ? (x.full>0 ? [fmt(x.full)+" ₽ →","подарок",""] : ["","подарок",""])
-    : (disc>0 ? [fmt(x.line)+" →", fmt(x.line*(1-disc/100))+" ₽", "(скидка "+disc+"%)"]
+    : (disc>0 ? [fmt(x.line)+" ₽ →", fmt(x.line*(1-disc/100))+" ₽", "(скидка "+disc+"%)"]
               : ["", fmt(x.line)+" ₽", ""]);
 
   L.push("Добрый день — составила для вас индивидуальное предложение с учётом пожеланий по охватам и расположению вашего бизнеса.");
