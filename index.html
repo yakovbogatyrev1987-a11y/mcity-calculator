@@ -288,6 +288,7 @@
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const fmt=n=>Math.round(n).toLocaleString("ru-RU");
+const rnd50=n=>Math.ceil(n/50)*50; // цену со скидкой округляем вверх до 50
 const fmt2=n=>n.toLocaleString("ru-RU",{minimumFractionDigits:2,maximumFractionDigits:2});
 const plural=(n,a,b,c)=>{const m=n%10,h=n%100;return m===1&&h!==11?a:(m>=2&&m<=4&&(h<10||h>=20)?b:c)};
 const wStend=n=>n+" "+plural(n,"стенд","стенда","стендов");
@@ -449,7 +450,10 @@ function calc(){
   const scBase=scItems+videoCost;
 
   const dS=Math.min(50,Math.max(0,S.standsDiscount||0)), dC=Math.min(50,Math.max(0,S.screensDiscount||0));
-  const standsDiscSum=standsBase*dS/100, scDiscSum=scBase*dC/100;
+  // сумма скидки такая, чтобы цена ПОСЛЕ скидки была ровной (округляем вверх до 50)
+  let standsDiscSum=standsBase*dS/100, scDiscSum=scBase*dC/100;
+  if(dS>0) standsDiscSum=standsBase-rnd50(standsBase-standsDiscSum);
+  if(dC>0) scDiscSum=scBase-rnd50(scBase-scDiscSum);
   const base=standsBase+scBase, discSum=standsDiscSum+scDiscSum, total=base-discSum;
   const contacts=standsContacts+scContacts, totalRes=standsRes+scRes;
   // цена без акций и скидок: все позиции по полной (подарки тоже), позиционирование и видео те же
@@ -549,7 +553,7 @@ function tgText(){
   // цена → 3 колонки: [было →] [итог] [скидка]. Итог («25 904 ₽» / «подарок») в общей колонке
   const priceTriple=(x,disc)=> x.gift
     ? (x.full>0 ? [fmt(x.full)+" ₽ →","подарок",""] : ["","подарок",""])
-    : (disc>0 ? [fmt(x.line)+" ₽ →", fmt(x.line*(1-disc/100))+" ₽", "(скидка "+disc+"%)"]
+    : (disc>0 ? [fmt(x.line)+" ₽ →", fmt(rnd50(x.line*(1-disc/100)))+" ₽", "(скидка "+disc+"%)"]
               : ["", fmt(x.line)+" ₽", ""]);
 
   L.push("Добрый день — составила для вас индивидуальное предложение с учётом пожеланий по охватам и расположению вашего бизнеса.");
@@ -612,7 +616,7 @@ function buildPrint(){
   const dS=r.standsDisc||0, dC=r.screensDisc||0;
   // ячейка цены: при скидке показываем старую цену (зачёркнута) и новую рядом
   const priceCell=(val,disc)=> disc>0
-    ? `<span style="color:#9aa0a8;font-weight:400;text-decoration:line-through">${fmt(val)} ₽</span> <span style="color:${RED};font-weight:800">${fmt(val*(1-disc/100))} ₽</span>`
+    ? `<span style="color:#9aa0a8;font-weight:400;text-decoration:line-through">${fmt(val)} ₽</span> <span style="color:${RED};font-weight:800">${fmt(rnd50(val*(1-disc/100)))} ₽</span>`
     : `${fmt(val)} ₽`;
   // ячейка подарка: зачёркнутая полная цена + «подарок»
   const giftCell=full=> full>0
