@@ -36,19 +36,21 @@
   var V=(typeof DATA!=="undefined"&&DATA.config&&DATA.config.viewsPerResidentMonth)||60;
   var fmt=function(n){return Math.round(n).toLocaleString("ru-RU");};
   var qs=new URLSearchParams(location.search);
-  var sName=qs.get("s"), eName=qs.get("e");
   var wrap=document.getElementById("wrap");
   function esc(s){return String(s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];});}
+  // слаг → имя (обратный поиск по ASLUG)
+  function findName(map,slug){ if(typeof ASLUG==="undefined")return null; for(var n in ASLUG[map]){ if(ASLUG[map][n]===slug) return n; } return null; }
   function header(title,sub){
     return '<div class="hd"><div class="logo">M<span>·</span>CITY</div>'+
       '<div><h1>'+esc(title)+'</h1><div class="sub">'+esc(sub)+'</div></div></div>';
   }
   function foot(){return '<div class="foot">M-CITY · реклама в лифтах · Красноярск · <a href="https://m-city124.ru">m-city124.ru</a>. Данные информационные, не являются офертой.</div>';}
   function build(){
-    var rows, isScreen=false, name;
+    var s=qs.get("s"), e=qs.get("e"), rows, isScreen=false, name;
     var hasAddr=(typeof ADDR!=="undefined");
-    if(sName && hasAddr && ADDR.stands[sName]){ rows=ADDR.stands[sName]; name=sName; }
-    else if(eName && hasAddr && ADDR.screens[eName]){ rows=ADDR.screens[eName]; isScreen=true; name=eName; }
+    var sn=s?findName("stands",s):null, en=e?findName("screens",e):null;
+    if(sn && hasAddr && ADDR.stands[sn]){ rows=ADDR.stands[sn]; name=sn; }
+    else if(en && hasAddr && ADDR.screens[en]){ rows=ADDR.screens[en]; isScreen=true; name=en; }
     else { wrap.innerHTML='<div class="err">Район не найден. Откройте ссылку из коммерческого предложения.</div>'; return; }
 
     var head, body="", tu=0,tk=0,tr=0;

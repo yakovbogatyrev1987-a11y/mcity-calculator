@@ -600,9 +600,10 @@ function tgText(){
   // Адреса размещения — отдельная ссылка на каждый район/объект (полный список в TG слишком объёмный)
   if(typeof ADDR!=="undefined" && (r.st.some(x=>ADDR.stands[x.name])||r.sc.some(x=>ADDR.screens[x.name]))){
     const abase=location.protocol==="file:"?"":location.href.replace(/[?#].*$/,"").replace(/[^/]*$/,"");
+    const hasSlug=typeof ASLUG!=="undefined";
     L.push("\n🏠 Адреса размещения и охват по домам:");
-    r.st.forEach(x=>{if(ADDR.stands[x.name])L.push("📍 "+x.name+": "+abase+"addresses.html?s="+encodeURIComponent(x.name));});
-    r.sc.forEach(x=>{if(ADDR.screens[x.name])L.push("📍 "+x.name+": "+abase+"addresses.html?e="+encodeURIComponent(x.name));});
+    r.st.forEach(x=>{if(ADDR.stands[x.name]&&hasSlug&&ASLUG.stands[x.name])L.push("📍 "+x.name+": "+abase+"a.html?s="+ASLUG.stands[x.name]);});
+    r.sc.forEach(x=>{if(ADDR.screens[x.name]&&hasSlug&&ASLUG.screens[x.name])L.push("📍 "+x.name+": "+abase+"a.html?e="+ASLUG.screens[x.name]);});
   }
   L.push("\n🗺️ Карта размещений: "+CFG.company.map);
   L.push("");
