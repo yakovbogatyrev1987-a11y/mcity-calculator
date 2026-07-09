@@ -612,7 +612,7 @@ function buildPrint(){
   const sec=t=>`<div style="background:${RED};color:#fff;font-weight:800;font-size:15px;padding:8px 14px;border-radius:7px;margin:22px 0 12px">${t}</div>`;
   const th=`background:#1b1f27;color:#fff;font-size:12px;text-align:left;padding:8px 10px`;
   const td=`padding:8px 10px;border-bottom:1px solid #e6e8ec;font-size:13px`;
-  const mediaCard=(t,v)=>`<div style="flex:1;min-width:120px;background:#f6f8fb;border:1px solid #e2e6ec;border-radius:10px;padding:12px 14px">
+  const mediaCard=(t,v)=>`<div style="flex:1;min-width:120px;background:#f6f8fb;border:1px solid #e2e6ec;border-radius:10px;padding:12px 14px;page-break-inside:avoid;break-inside:avoid">
     <div style="color:#666;font-size:12px">${t}</div><div style="font-size:20px;font-weight:800;color:${RED}">${v}</div></div>`;
   const dS=r.standsDisc||0, dC=r.screensDisc||0;
   // ячейка цены: при скидке показываем старую цену (зачёркнута) и новую рядом
@@ -690,7 +690,7 @@ function buildPrint(){
       <tr><td style="padding:12px 10px;border-top:2px solid #111;font-size:20px;font-weight:800">ИТОГО</td>
       <td style="padding:12px 10px;border-top:2px solid #111;font-size:20px;font-weight:800;text-align:right;color:${RED}">${fmt(r.total)} ₽</td></tr>
     </table>
-    ${r.benefit>0?`<div style="margin-top:14px;background:#eafaf2;border:1px solid #9fe3c4;border-radius:10px;padding:14px 16px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+    ${r.benefit>0?`<div style="margin-top:14px;background:#eafaf2;border:1px solid #9fe3c4;border-radius:10px;padding:14px 16px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;page-break-inside:avoid;break-inside:avoid">
       <div style="flex:1;min-width:140px"><div style="color:#666;font-size:12px">Цена без акций и скидок</div>
         <div style="font-size:18px;font-weight:700;color:#999;text-decoration:line-through">${fmt(r.fullNoPromo)} ₽</div></div>
       <div style="flex:1;min-width:120px"><div style="color:#666;font-size:12px">Ваша цена</div>
@@ -698,7 +698,7 @@ function buildPrint(){
       <div style="flex:1;min-width:140px;text-align:right"><div style="color:#1a9e6c;font-size:12px;font-weight:700">ВАША ВЫГОДА</div>
         <div style="font-size:24px;font-weight:900;color:#1a9e6c">−${fmt(r.benefit)} ₽</div></div>
     </div>${(r.giftStands+r.giftScreens)>0?`<div style="color:#1a9e6c;font-size:12px;margin-top:6px">🎁 В выгоду входят бесплатные размещения по акции${(r.standsDiscSum+r.scDiscSum)>0?' и скидки':''}.</div>`:""}`:""}
-    ${r.contacts>0?`<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+    ${r.contacts>0?`<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;page-break-inside:avoid;break-inside:avoid">
       ${mediaCard("Зрительных контактов в месяц",fmt(r.contacts))}
       ${mediaCard("Зрительных контактов в день",fmt(r.contacts/30))}
       ${mediaCard("Покупателей (всего)",fmt(r.totalRes))}
