@@ -285,6 +285,7 @@
 
 <script src="data.js"></script>
 <script src="sferi.js"></script>
+<script src="addresses.js"></script>
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const fmt=n=>Math.round(n).toLocaleString("ru-RU");
@@ -711,6 +712,51 @@ function buildPrint(){
       [...S.pics].map(idx=>`<img src="${sf.imgs[idx]}" style="width:92mm;height:130mm;object-fit:contain;background:#fff;border:1px solid #ddd;border-radius:6px;page-break-inside:avoid">`).join("")+`</div>`;
   }
 
+  // Подробные адреса выбранных районов/объектов — в самом низу КП
+  let addrHtml="";
+  const aTh=`background:#1b1f27;color:#fff;font-size:11px;text-align:left;padding:6px 8px`;
+  const aTd=`padding:5px 8px;border-bottom:1px solid #e6e8ec;font-size:11px`;
+  const aTot=`padding:6px 8px;font-size:11px;font-weight:800;background:#fff7c2;border-top:2px solid #111`;
+  const addrStandTable=(name,rows)=>{ let fr=0,ap=0,rs=0;
+    const body=rows.map((x,i)=>{fr+=x[1];ap+=x[2];rs+=x[3];
+      return `<tr><td style="${aTd};text-align:center">${i+1}</td><td style="${aTd}">${x[0]}</td>
+        <td style="${aTd};text-align:right">${x[1]}</td><td style="${aTd};text-align:right">${fmt(x[2])}</td>
+        <td style="${aTd};text-align:right">${fmt(x[3])}</td><td style="${aTd};text-align:right">${fmt(x[3]*V)}</td>
+        <td style="${aTd};text-align:center">${x[4]||"—"}</td></tr>`;}).join("");
+    return `<div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:5px">📍 ${name} — адреса стендов</div>
+      <table style="width:100%;border-collapse:collapse">
+      <tr><th style="${aTh};text-align:center">№</th><th style="${aTh}">Адрес</th><th style="${aTh};text-align:right">Рамок</th>
+        <th style="${aTh};text-align:right">Квартир</th><th style="${aTh};text-align:right">Жителей</th>
+        <th style="${aTh};text-align:right">Контактов&nbsp;/&nbsp;мес</th><th style="${aTh};text-align:center">Год</th></tr>
+      ${body}
+      <tr><td style="${aTot}" colspan="2">Итого:</td><td style="${aTot};text-align:right">${fr}</td>
+        <td style="${aTot};text-align:right">${fmt(ap)}</td><td style="${aTot};text-align:right">${fmt(rs)}</td>
+        <td style="${aTot};text-align:right">${fmt(rs*V)}</td><td style="${aTot}"></td></tr>
+      </table></div>`; };
+  const addrScreenTable=(name,rows)=>{ let mo=0,ap=0,rs=0;
+    const body=rows.map((x,i)=>{mo+=x[1];ap+=x[2];rs+=x[3];
+      return `<tr><td style="${aTd};text-align:center">${i+1}</td><td style="${aTd}">${x[0]}</td>
+        <td style="${aTd};text-align:right">${x[1]}</td><td style="${aTd};text-align:right">${fmt(x[2])}</td>
+        <td style="${aTd};text-align:right">${fmt(x[3])}</td><td style="${aTd};text-align:right">${fmt(x[3]*V)}</td></tr>`;}).join("");
+    return `<div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:5px">📍 ${name} — адреса экранов</div>
+      <table style="width:100%;border-collapse:collapse">
+      <tr><th style="${aTh};text-align:center">№</th><th style="${aTh}">Адрес</th><th style="${aTh};text-align:right">Мониторов</th>
+        <th style="${aTh};text-align:right">Помещений</th><th style="${aTh};text-align:right">Жителей</th>
+        <th style="${aTh};text-align:right">Контактов&nbsp;/&nbsp;мес</th></tr>
+      ${body}
+      <tr><td style="${aTot}" colspan="2">Итого:</td><td style="${aTot};text-align:right">${mo}</td>
+        <td style="${aTot};text-align:right">${fmt(ap)}</td><td style="${aTot};text-align:right">${fmt(rs)}</td>
+        <td style="${aTot};text-align:right">${fmt(rs*V)}</td></tr>
+      </table></div>`; };
+  const hasADDR=typeof ADDR!=="undefined";
+  const standAddr=hasADDR?r.st.map(x=>ADDR.stands[x.name]?addrStandTable(x.name,ADDR.stands[x.name]):"").join(""):"";
+  const screenAddr=hasADDR?r.sc.map(x=>ADDR.screens[x.name]?addrScreenTable(x.name,ADDR.screens[x.name]):"").join(""):"";
+  if(standAddr||screenAddr){
+    addrHtml=sec("Адреса размещения и охват")+
+      `<div style="color:#666;font-size:12px;margin:-4px 0 2px">Полный список адресов по выбранным районам и объектам: количество рамок / мониторов, жителей и зрительных контактов в месяц (жители × 60).</div>`+
+      standAddr+screenAddr;
+  }
+
   $("#printArea").innerHTML=`<div style="font-family:Arial,sans-serif;color:#111;max-width:760px;margin:0 auto;padding:6px">
     <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:4px solid ${RED};padding-bottom:14px">
       <div style="display:flex;align-items:center;gap:12px">
@@ -720,7 +766,7 @@ function buildPrint(){
       </div>
     </div>
     ${S.client?`<div style="margin-top:14px;font-size:15px">Для: <b>${S.client}</b></div>`:""}
-    ${standsHtml}${screensHtml}${totalHtml}${picsHtml}
+    ${standsHtml}${screensHtml}${totalHtml}${picsHtml}${addrHtml}
     <div style="margin-top:18px;color:#999;font-size:11px;border-top:1px solid #eee;padding-top:10px">
       Предложение носит информационный характер и не является публичной офертой. Цены действительны на ${today}.</div>
   </div>`;
