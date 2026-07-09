@@ -614,6 +614,25 @@ function tgText(){
   return L.join("\n");
 }
 
+// HTML-версия для буфера обмена: таблицы → <pre> (моноширинно), строки-адреса → ссылка-слово.
+// При вставке в Telegram на компьютере ссылка становится кликабельным словом «Открыть адреса».
+function tgHtml(plain){
+  const esc=s=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const lines=plain.split("\n"); let out="", inCode=false, buf=[];
+  for(const ln of lines){
+    if(ln.trim()==="```"){
+      if(!inCode){inCode=true;buf=[];}
+      else{inCode=false;out+="<pre>"+esc(buf.join("\n"))+"</pre>";}
+      continue;
+    }
+    if(inCode){buf.push(ln);continue;}
+    const m=ln.match(/^(📍 .*?: )(https?:\/\/\S*a\.html\?[se]=\S+)$/);
+    if(m){out+=esc(m[1])+'<a href="'+m[2]+'">Открыть адреса</a><br>';continue;}
+    out+=esc(ln)+"<br>";
+  }
+  return out;
+}
+
 /* ---------- PDF ---------- */
 function buildPrint(){
   const r=calc(), m=S.manager, today=new Date().toLocaleDateString("ru-RU"), RED="#e21f2b";
@@ -968,9 +987,22 @@ function bind(){
     Promise.race([ready,new Promise(r=>setTimeout(r,8000))]).then(()=>exportWord().then(()=>toast("Word скачан ✓")).catch(()=>toast("Не удалось собрать Word")));});
   $("#btnTg").addEventListener("click",async()=>{if(!S.stands.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
     const txt=tgText();
-    try{await navigator.clipboard.writeText(txt);toast("Скопировано ✓");}
-    catch(_){const ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();
-      document.execCommand("copy");ta.remove();toast("Скопировано ✓");}});
+    // Кладём и HTML (ссылка-слово для Telegram на ПК), и обычный текст (запасной, для телефона)
+    try{
+      if(navigator.clipboard&&window.ClipboardItem){
+        const html=tgHtml(txt);
+        await navigator.clipboard.write([new ClipboardItem({
+          "text/html":new Blob([html],{type:"text/html"}),
+          "text/plain":new Blob([txt],{type:"text/plain"})
+        })]);
+        toast("Скопировано ✓");
+      } else {
+        await navigator.clipboard.writeText(txt);toast("Скопировано ✓");
+      }
+    }
+    catch(_){try{await navigator.clipboard.writeText(txt);toast("Скопировано ✓");}
+      catch(__){const ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();
+        document.execCommand("copy");ta.remove();toast("Скопировано ✓");}}});
 }
 
 buildUI(); bind(); render();
