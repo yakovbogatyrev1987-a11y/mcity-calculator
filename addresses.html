@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Адреса размещения — M-CITY</title>
+<style>
+  :root{--red:#e21f2b;--ink:#111;--mut:#666;--line:#e6e8ec}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);background:#f4f5f7;padding:16px}
+  .wrap{max-width:820px;margin:0 auto;background:#fff;border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.08);overflow:hidden}
+  .hd{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:4px solid var(--red)}
+  .logo{width:46px;height:46px;border:3px solid var(--red);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;flex:0 0 auto}
+  .logo span{color:var(--red)}
+  .hd h1{margin:0;font-size:19px}
+  .hd .sub{color:var(--mut);font-size:13px;margin-top:2px}
+  .body{padding:16px 18px}
+  .note{color:var(--mut);font-size:13px;margin:0 0 12px}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{width:100%;border-collapse:collapse;min-width:520px}
+  th{background:#1b1f27;color:#fff;font-size:12px;text-align:left;padding:8px 10px;white-space:nowrap}
+  td{padding:7px 10px;border-bottom:1px solid var(--line);font-size:13px}
+  .r{text-align:right;white-space:nowrap}.c{text-align:center}
+  tr.tot td{background:#fff7c2;font-weight:800;border-top:2px solid #111}
+  .err{padding:30px 18px;color:var(--mut);text-align:center}
+  .foot{padding:12px 18px;color:#999;font-size:11px;border-top:1px solid #eee}
+  a{color:var(--red)}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap"><div class="err">Загрузка…</div></div>
+<script src="data.js"></script>
+<script src="addresses.js"></script>
+<script>
+(function(){
+  var V=(typeof DATA!=="undefined"&&DATA.config&&DATA.config.viewsPerResidentMonth)||60;
+  var fmt=function(n){return Math.round(n).toLocaleString("ru-RU");};
+  var qs=new URLSearchParams(location.search);
+  var sName=qs.get("s"), eName=qs.get("e");
+  var wrap=document.getElementById("wrap");
+  function esc(s){return String(s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];});}
+  function header(title,sub){
+    return '<div class="hd"><div class="logo">M<span>·</span>CITY</div>'+
+      '<div><h1>'+esc(title)+'</h1><div class="sub">'+esc(sub)+'</div></div></div>';
+  }
+  function foot(){return '<div class="foot">M-CITY · реклама в лифтах · Красноярск · <a href="https://m-city124.ru">m-city124.ru</a>. Данные информационные, не являются офертой.</div>';}
+  function build(){
+    var rows, isScreen=false, name;
+    var hasAddr=(typeof ADDR!=="undefined");
+    if(sName && hasAddr && ADDR.stands[sName]){ rows=ADDR.stands[sName]; name=sName; }
+    else if(eName && hasAddr && ADDR.screens[eName]){ rows=ADDR.screens[eName]; isScreen=true; name=eName; }
+    else { wrap.innerHTML='<div class="err">Район не найден. Откройте ссылку из коммерческого предложения.</div>'; return; }
+
+    var head, body="", tu=0,tk=0,tr=0;
+    if(!isScreen){
+      head='<tr><th class="c">№</th><th>Адрес</th><th class="r">Рамок</th><th class="r">Квартир</th><th class="r">Жителей</th><th class="r">Контактов/мес</th><th class="c">Год</th></tr>';
+      rows.forEach(function(x,i){ tu+=x[1];tk+=x[2];tr+=x[3];
+        body+='<tr><td class="c">'+(i+1)+'</td><td>'+esc(x[0])+'</td><td class="r">'+x[1]+'</td><td class="r">'+fmt(x[2])+
+          '</td><td class="r">'+fmt(x[3])+'</td><td class="r">'+fmt(x[3]*V)+'</td><td class="c">'+(x[4]||"—")+'</td></tr>';
+      });
+      body+='<tr class="tot"><td></td><td>Итого:</td><td class="r">'+tu+'</td><td class="r">'+fmt(tk)+'</td><td class="r">'+fmt(tr)+'</td><td class="r">'+fmt(tr*V)+'</td><td></td></tr>';
+      wrap.innerHTML=header(name,"Адреса стендов · охват по каждому дому")+
+        '<div class="body"><p class="note">Каждый житель пользуется лифтом минимум 2 раза в день — это ×60 зрительных контактов с рекламой в месяц.</p>'+
+        '<div class="scroll"><table>'+head+body+'</table></div></div>'+foot();
+    } else {
+      head='<tr><th class="c">№</th><th>Адрес</th><th class="r">Мониторов</th><th class="r">Помещений</th><th class="r">Жителей</th><th class="r">Контактов/мес</th></tr>';
+      rows.forEach(function(x,i){ tu+=x[1];tk+=x[2];tr+=x[3];
+        body+='<tr><td class="c">'+(i+1)+'</td><td>'+esc(x[0])+'</td><td class="r">'+x[1]+'</td><td class="r">'+fmt(x[2])+
+          '</td><td class="r">'+fmt(x[3])+'</td><td class="r">'+fmt(x[3]*V)+'</td></tr>';
+      });
+      body+='<tr class="tot"><td></td><td>Итого:</td><td class="r">'+tu+'</td><td class="r">'+fmt(tk)+'</td><td class="r">'+fmt(tr)+'</td><td class="r">'+fmt(tr*V)+'</td></tr>';
+      wrap.innerHTML=header(name,"Адреса экранов · охват по каждому дому")+
+        '<div class="body"><p class="note">Каждый житель пользуется лифтом минимум 2 раза в день — это ×60 зрительных контактов с рекламой в месяц.</p>'+
+        '<div class="scroll"><table>'+head+body+'</table></div></div>'+foot();
+    }
+    document.title=name+" — адреса — M-CITY";
+  }
+  build();
+})();
+</script>
+</body>
+</html>

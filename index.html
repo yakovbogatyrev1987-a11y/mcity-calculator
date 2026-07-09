@@ -597,19 +597,12 @@ function tgText(){
     L.push("\n📸 Примеры наших работ («"+sf.name+"»):");
     [...S.pics].forEach(idx=>L.push(base+sf.imgs[idx]));
   }
-  // Адреса размещения (компактно: адрес · шт · жители · Итого)
-  const addrBlock=(title,rows,unit)=>{
-    const data=[["Адрес",unit,"жит."]].concat(rows.map(x=>[x[0],String(x[1]),fmt(x[2])]));
-    let tu=0,tr=0; rows.forEach(x=>{tu+=x[1];tr+=x[2];});
-    data.push(["Итого",String(tu),fmt(tr)]);
-    const w=[0,1,2].map(c=>Math.max(...data.map(rw=>rw[c].length)));
-    const body=data.map(rw=>padR(rw[0],w[0])+"  "+padL(rw[1],w[1])+"  "+padL(rw[2],w[2])).join("\n");
-    return title+"\n```\n"+body+"\n```";
-  };
+  // Адреса размещения — отдельная ссылка на каждый район/объект (полный список в TG слишком объёмный)
   if(typeof ADDR!=="undefined" && (r.st.some(x=>ADDR.stands[x.name])||r.sc.some(x=>ADDR.screens[x.name]))){
-    L.push("\n🏠 Адреса размещения:");
-    r.st.forEach(x=>{const a=ADDR.stands[x.name]; if(a)L.push(addrBlock("📍 "+x.name+" (рамок · жителей):",a.map(y=>[y[0],y[1],y[3]]),"рам"));});
-    r.sc.forEach(x=>{const a=ADDR.screens[x.name]; if(a)L.push(addrBlock("📍 "+x.name+" (мониторов · жителей):",a.map(y=>[y[0],y[1],y[3]]),"мон"));});
+    const abase=location.protocol==="file:"?"":location.href.replace(/[?#].*$/,"").replace(/[^/]*$/,"");
+    L.push("\n🏠 Адреса размещения и охват по домам:");
+    r.st.forEach(x=>{if(ADDR.stands[x.name])L.push("📍 "+x.name+": "+abase+"addresses.html?s="+encodeURIComponent(x.name));});
+    r.sc.forEach(x=>{if(ADDR.screens[x.name])L.push("📍 "+x.name+": "+abase+"addresses.html?e="+encodeURIComponent(x.name));});
   }
   L.push("\n🗺️ Карта размещений: "+CFG.company.map);
   L.push("");
