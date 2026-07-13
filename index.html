@@ -605,7 +605,16 @@ function tgText(){
     r.st.forEach(x=>{if(ADDR.stands[x.name]&&hasSlug&&ASLUG.stands[x.name])L.push("📍 "+x.name+": "+abase+"a.html?s="+ASLUG.stands[x.name]);});
     r.sc.forEach(x=>{if(ADDR.screens[x.name]&&hasSlug&&ASLUG.screens[x.name])L.push("📍 "+x.name+": "+abase+"a.html?e="+ASLUG.screens[x.name]);});
   }
-  L.push("\n🗺️ Карта размещений: "+CFG.company.map);
+  // карта под выбор: стенды → карта стендов, экраны → карта экранов, оба → обе
+  const mapScreens=CFG.company.mapScreens||CFG.company.map;
+  if(r.st.length&&r.sc.length){
+    L.push("\n🗺️ Карта стендов: "+CFG.company.map);
+    L.push("🗺️ Карта экранов: "+mapScreens);
+  } else if(r.sc.length){
+    L.push("\n🗺️ Карта размещений (экраны): "+mapScreens);
+  } else {
+    L.push("\n🗺️ Карта размещений: "+CFG.company.map);
+  }
   L.push("");
   const c=[]; if(m.name)c.push(m.name); if(m.phone)c.push("📞 "+m.phone);
   if(m.tg)c.push("✈️ "+m.tg); if(m.max)c.push("MAX: "+m.max); if(m.email)c.push("✉️ "+m.email);
