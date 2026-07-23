@@ -680,8 +680,8 @@ function buildPrint(){
     const PH=190; // одинаковая высота матрицы и фото в PDF
     const matH=svg=>svg.replace("<svg ",`<svg style="height:${PH}px;width:auto" `);
     const blocks=[];
-    if(stdSel)blocks.push({t:'Обычные стенды',mat:S.slotsStd.size?matrixSVG('std',S.slotsStd,false):'',photo:'assets/board_stend.png'});
-    if(southSel)blocks.push({t:'Южный берег / Образцово',mat:S.slotsSouth.size?matrixSVG('south',S.slotsSouth,false):'',photo:'assets/board_south.png'});
+    if(stdSel)blocks.push({t:'Обычные стенды',mat:S.slotsStd.size?matrixSVG('std',S.slotsStd,false):'',photo:'assets/board_stend.jpg'});
+    if(southSel)blocks.push({t:'Южный берег / Образцово',mat:S.slotsSouth.size?matrixSVG('south',S.slotsSouth,false):'',photo:'assets/board_south.jpg'});
     blocks.forEach(b=>{
       if(b.mat){
         // позиционирование выбрано → матрица и фото в один ряд, одного размера
@@ -714,7 +714,7 @@ function buildPrint(){
         <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,dC)}</td></tr>`).join("")+
       (r.videoCost?`<tr><td style="${td}" colspan="4">Разработка видеоролика${S.videoFix>0?' + '+S.videoFix+' корректировки':''}</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.videoCost,dC)}</td></tr>`:"")+`</table>`;
     if(r.giftScreens>0)screensHtml+=`<div style="color:#1a9e6c;font-size:12px;margin-top:4px">🎁 Акция: ${r.giftScreens} ${plural(r.giftScreens,"объект","объекта","объектов")} в подарок.</div>`;
-    screensHtml+=`<div style="margin-top:12px;text-align:center"><img src="assets/screen.png" style="max-height:360px;max-width:60%;border-radius:8px;border:1px solid #ddd">
+    screensHtml+=`<div style="margin-top:12px;text-align:center"><img src="assets/screen.jpg" style="max-height:360px;max-width:60%;border-radius:8px;border:1px solid #ddd">
       <div style="color:#888;font-size:11px;margin-top:4px">Экран 21,5″ Full HD в лифте элитного дома</div></div>`;
   }
 
@@ -983,17 +983,20 @@ function bind(){
   $("#discStands").addEventListener("input",e=>{S.standsDiscount=+e.target.value||0;render();});
   $("#discScreens").addEventListener("input",e=>{S.screensDiscount=+e.target.value||0;render();});
 
+  // ждём и ЗАГРУЗКУ, и ДЕКОДИРОВАНИЕ картинок — иначе печать ловит наполовину прорисованное фото
+  const imgsReady=imgs=>Promise.all(imgs.map(im=>{
+    const loaded=(im.complete&&im.naturalWidth)?Promise.resolve():new Promise(res=>{im.onload=im.onerror=res;});
+    return loaded.then(()=>im.decode?im.decode().catch(()=>{}):null);
+  }));
   $("#btnPdf").addEventListener("click",()=>{if(!S.stands.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
     buildPrint();
     const oldTitle=document.title; document.title=" ";   // убираем «M-CITY · Калькулятор…» из колонтитула печати
     const imgs=[...document.querySelectorAll("#printArea img")];
-    const ready=Promise.all(imgs.map(im=>im.complete&&im.naturalWidth?Promise.resolve():new Promise(res=>{im.onload=im.onerror=res;})));
-    Promise.race([ready,new Promise(r=>setTimeout(r,6000))]).then(()=>{window.print(); document.title=oldTitle;});});
+    Promise.race([imgsReady(imgs),new Promise(r=>setTimeout(r,15000))]).then(()=>{window.print(); document.title=oldTitle;});});
   $("#btnWord").addEventListener("click",()=>{if(!S.stands.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
     toast("Готовлю Word…"); buildPrint();
     const imgs=[...document.querySelectorAll("#printArea img")];
-    const ready=Promise.all(imgs.map(im=>im.complete&&im.naturalWidth?Promise.resolve():new Promise(res=>{im.onload=im.onerror=res;})));
-    Promise.race([ready,new Promise(r=>setTimeout(r,8000))]).then(()=>exportWord().then(()=>toast("Word скачан ✓")).catch(()=>toast("Не удалось собрать Word")));});
+    Promise.race([imgsReady(imgs),new Promise(r=>setTimeout(r,15000))]).then(()=>exportWord().then(()=>toast("Word скачан ✓")).catch(()=>toast("Не удалось собрать Word")));});
   $("#btnTg").addEventListener("click",async()=>{if(!S.stands.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
     const txt=tgText();
     // Кладём и HTML (ссылка-слово для Telegram на ПК), и обычный текст (запасной, для телефона)
