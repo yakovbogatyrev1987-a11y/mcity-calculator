@@ -429,7 +429,8 @@ function renderThumbs(){
 
 /* ---------- РАСЧЁТ ---------- */
 function calc(){
-  // множитель срока по стендам: 30 дней = 1, 15 дней = 0.5 (цена/охват делятся пополам)
+  // множитель срока по стендам: 30 дней = 1, 15 дней = 0.5. Делится только ЦЕНА;
+  // охват «в день/в месяц» — это ставка (жители×2 в день), от срока не зависит.
   const df=(S.standsDays===15?0.5:1);
   // позиционирование = сумма выбранных ячеек матрицы (по формату), ×периодов ×срок
   let posRaw=0; const posBreak={};
@@ -438,22 +439,22 @@ function calc(){
   posRaw*=S.standsPeriods*df;
   const posSum=S.posAll?posRaw:0;
 
-  const st=[]; let standsItems=0,standsContacts=0,standsRes=0,standsUnits=0,giftStands=0;
+  const st=[]; let standsItems=0,standsContacts=0,standsExpo=0,standsRes=0,standsUnits=0,giftStands=0;
   S.stands.forEach((f,i)=>{
     const r=DATA.stands[i], price=r.p[f]; if(price==null)return;
     const gift=S.standsGifts.has(i);
-    const line=gift?0:price*S.standsPeriods*df, contacts=r.res*V*S.standsPeriods*df;
-    standsItems+=line; standsContacts+=contacts; standsRes+=r.res; standsUnits+=r.count; if(gift)giftStands++;
+    const line=gift?0:price*S.standsPeriods*df, contacts=r.res*V*S.standsPeriods;  // охват — БЕЗ df (ставка/мес)
+    standsItems+=line; standsContacts+=contacts; standsExpo+=contacts*df; standsRes+=r.res; standsUnits+=r.count; if(gift)giftStands++;
     st.push({i,name:r.name,count:r.count,res:r.res,fmt:CFG.formats[f].label,fi:f,gift,
       line,full:price*S.standsPeriods*df,contacts,cpc:(!gift&&r.res)?price/(r.res*V):0});
   });
   const standsBase=standsItems+posSum;
 
-  const sc=[]; let scItems=0,scContacts=0,scRes=0,scUnits=0,giftScreens=0;
+  const sc=[]; let scItems=0,scContacts=0,scExpo=0,scRes=0,scUnits=0,giftScreens=0;
   S.screens.forEach(key=>{const[gi,ii]=key.split("|").map(Number); const r=DATA.screens[gi].items[ii];
     const gift=S.screensGifts.has(key);
     const pm=r.p[S.intensity], line=gift?0:pm*S.screensMonths, contacts=r.res*V*S.screensMonths;
-    scItems+=line; scContacts+=contacts; scRes+=r.res; scUnits+=r.count; if(gift)giftScreens++;
+    scItems+=line; scContacts+=contacts; scExpo+=contacts; scRes+=r.res; scUnits+=r.count; if(gift)giftScreens++;
     sc.push({key,name:r.name,count:r.count,res:r.res,gift,line,full:pm*S.screensMonths,contacts,cpc:(!gift&&r.res)?pm/(r.res*V):0});});
   let videoCost=0;
   if(S.screens.size){ if(S.video)videoCost+=CFG.video.make; if(S.videoFix>0)videoCost+=CFG.video.fix*S.videoFix; }
@@ -466,6 +467,7 @@ function calc(){
   if(dC>0) scDiscSum=scBase-rnd50(scBase-scDiscSum);
   const base=standsBase+scBase, discSum=standsDiscSum+scDiscSum, total=base-discSum;
   const contacts=standsContacts+scContacts, totalRes=standsRes+scRes;
+  const exposures=standsExpo+scExpo;   // экспозиции с учётом срока — только для стоимости 1 контакта
   // цена без акций и скидок: все позиции по полной (подарки тоже), позиционирование и видео те же
   const fullStands=st.reduce((a,x)=>a+x.full,0)+posSum;
   const fullScreens=sc.reduce((a,x)=>a+x.full,0)+videoCost;
@@ -474,7 +476,7 @@ function calc(){
   return {st,sc,standsBase,scBase,videoCost,base,discSum,total,contacts,totalRes,
     standsUnits,scUnits,giftStands,giftScreens,posRaw,posSum,posBreak,
     fullNoPromo,benefit,
-    standsDisc:dS,screensDisc:dC,standsDiscSum,scDiscSum,cpc:contacts?total/contacts:0};
+    standsDisc:dS,screensDisc:dC,standsDiscSum,scDiscSum,cpc:exposures?total/exposures:0};
 }
 
 /* ---------- СВОДКА ---------- */
