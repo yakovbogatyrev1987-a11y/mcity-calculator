@@ -179,7 +179,7 @@
             </div>
           </div>
           <div class="field">
-            <label class="lbl">Количество периодов размещения <span class="mini" id="periodHint">(1 период = 30 дней, −7 дней в подарок)</span></label>
+            <label class="lbl">Количество месяцев размещения <span class="mini" id="periodHint">(1 месяц = 30 дней, −7 дней в подарок)</span></label>
             <div class="stepper"><button type="button" data-step="standsPeriods,-1">−</button>
               <input type="number" id="standsPeriods" value="1" min="1"><button type="button" data-step="standsPeriods,1">+</button></div>
           </div>
@@ -446,7 +446,7 @@ function calc(){
     const line=gift?0:price*S.standsPeriods*df, contacts=r.res*V*S.standsPeriods;  // охват — БЕЗ df (ставка/мес)
     standsItems+=line; standsContacts+=contacts; standsExpo+=contacts*df; standsRes+=r.res; standsUnits+=r.count; if(gift)giftStands++;
     st.push({i,name:r.name,count:r.count,res:r.res,fmt:CFG.formats[f].label,fi:f,gift,
-      line,full:price*S.standsPeriods*df,contacts,cpc:(!gift&&r.res)?price/(r.res*V):0});
+      line,full:price*S.standsPeriods*df,contacts:contacts*df,cpc:(!gift&&r.res)?price/(r.res*V):0});
   });
   const standsBase=standsItems+posSum;
 
@@ -473,7 +473,7 @@ function calc(){
   const fullScreens=sc.reduce((a,x)=>a+x.full,0)+videoCost;
   const fullNoPromo=fullStands+fullScreens;
   const benefit=fullNoPromo-total;        // выгода клиента
-  return {st,sc,standsBase,scBase,videoCost,base,discSum,total,contacts,totalRes,
+  return {st,sc,standsBase,scBase,videoCost,base,discSum,total,contacts,exposures,totalRes,
     standsUnits,scUnits,giftStands,giftScreens,posRaw,posSum,posBreak,
     fullNoPromo,benefit,
     standsDisc:dS,screensDisc:dC,standsDiscSum,scDiscSum,cpc:exposures?total/exposures:0};
@@ -485,13 +485,13 @@ function render(){
   renderPlace();
   const r=calc();
   // подсказка про период зависит от срока (30/15 дней)
-  $("#periodHint").textContent = S.standsDays===15 ? "(1 период = 15 дней, ½ цены)" : "(1 период = 30 дней, −7 дней в подарок)";
+  $("#periodHint").textContent = S.standsDays===15 ? "(1 = 15 дней, ½ месяца)" : "(1 месяц = 30 дней, −7 дней в подарок)";
   // блок позиционирования
   $("#posCheck").classList.toggle("sel",S.posAll);
   $("#posPrice").textContent="+"+fmt(r.posSum)+" ₽";
   const bt=posBreakText(r.posBreak);
   $("#posBreak").innerHTML = (S.slotsStd.size+S.slotsSouth.size)
-    ? `Выбрано мест: <b>${bt}</b> → ${fmt(r.posRaw)} ₽${S.standsPeriods>1?' (×'+S.standsPeriods+' периодов учтено)':''}. ${S.posAll?'Включено в стоимость.':'Тумблер выключен — места показаны как «примерные», без доплаты.'}`
+    ? `Выбрано мест: <b>${bt}</b> → ${fmt(r.posRaw)} ₽${S.standsPeriods>1?' (×'+S.standsPeriods+' мес. учтено)':''}. ${S.posAll?'Включено в стоимость.':'Тумблер выключен — места показаны как «примерные», без доплаты.'}`
     : 'Отметьте места в блоке «Примерное место на стенде» — сумма посчитается автоматически.';
 
   if(!r.st.length && !r.sc.length){
@@ -522,7 +522,7 @@ function render(){
     if(r.standsUnits)mb+=mrow("Стендов в охвате",fmt(r.standsUnits));
     if(r.scUnits)mb+=mrow("Экранов в охвате",fmt(r.scUnits));
     mb+=mrow("Покупателей (жителей)",fmt(r.totalRes));
-    mb+=mrow("Зрительных контактов в месяц",fmt(r.contacts));
+    mb+=mrow("Зрительных контактов в месяц",fmt(r.exposures));
     mb+=mrow("Зрительных контактов в день",fmt(r.contacts/30));
     mb+=mrow("Стоимость 1 контакта",fmt2(r.cpc)+" ₽");
     mb+=`</div>`;
@@ -601,7 +601,7 @@ function tgText(){
   }
   if(r.contacts>0){
     L.push("\n📊 Покупателей: "+fmt(r.totalRes));
-    L.push("👁️ Зрительных контактов в месяц: "+fmt(r.contacts)+" (в день: "+fmt(r.contacts/30)+")");
+    L.push("👁️ Зрительных контактов в месяц: "+fmt(r.exposures)+" (в день: "+fmt(r.contacts/30)+")");
     L.push("🎯 Стоимость 1 контакта: "+fmt2(r.cpc)+" ₽");
   }
   if(S.sfera!==""&&S.pics.size){
@@ -748,7 +748,7 @@ function buildPrint(){
         <div style="font-size:24px;font-weight:900;color:#1a9e6c">−${fmt(r.benefit)} ₽</div></div>
     </div>${(r.giftStands+r.giftScreens)>0?`<div style="color:#1a9e6c;font-size:12px;margin-top:6px">🎁 В выгоду входят бесплатные размещения по акции${(r.standsDiscSum+r.scDiscSum)>0?' и скидки':''}.</div>`:""}`:""}
     ${r.contacts>0?`<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;page-break-inside:avoid;break-inside:avoid">
-      ${mediaCard("Зрительных контактов в месяц",fmt(r.contacts))}
+      ${mediaCard("Зрительных контактов в месяц",fmt(r.exposures))}
       ${mediaCard("Зрительных контактов в день",fmt(r.contacts/30))}
       ${mediaCard("Покупателей (всего)",fmt(r.totalRes))}
       ${mediaCard("Стоимость 1 контакта",fmt2(r.cpc)+" ₽")}
