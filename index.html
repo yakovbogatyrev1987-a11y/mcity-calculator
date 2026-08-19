@@ -172,7 +172,14 @@
             <div class="hint">Отметьте район → выберите формат. У каждого района может быть свой формат.</div>
           </div>
           <div class="field">
-            <label class="lbl">Количество периодов размещения <span class="mini">(1 период = 30 дней, −7 дней в подарок)</span></label>
+            <label class="lbl">Срок размещения по стендам</label>
+            <div class="opts">
+              <span class="opt sel" data-days="30">30 дней<br><span class="mini">7 дней в подарок</span></span>
+              <span class="opt" data-days="15">15 дней<br><span class="mini">½ цены</span></span>
+            </div>
+          </div>
+          <div class="field">
+            <label class="lbl">Количество периодов размещения <span class="mini" id="periodHint">(1 период = 30 дней, −7 дней в подарок)</span></label>
             <div class="stepper"><button type="button" data-step="standsPeriods,-1">−</button>
               <input type="number" id="standsPeriods" value="1" min="1"><button type="button" data-step="standsPeriods,1">+</button></div>
           </div>
@@ -319,7 +326,7 @@ const S={
   posAll:false,
   screens:new Set(),       // "g|i"
   screensGifts:new Set(),  // "g|i" (ЖК в подарок)
-  intensity:0, screensMonths:1, standsPeriods:1,
+  intensity:0, screensMonths:1, standsPeriods:1, standsDays:30,
   video:false, videoFix:0,
   standsDiscount:0, screensDiscount:0,
   sfera:"", pics:new Set(),
@@ -422,21 +429,23 @@ function renderThumbs(){
 
 /* ---------- РАСЧЁТ ---------- */
 function calc(){
-  // позиционирование = сумма выбранных ячеек матрицы (по формату), ×периодов
+  // множитель срока по стендам: 30 дней = 1, 15 дней = 0.5 (цена/охват делятся пополам)
+  const df=(S.standsDays===15?0.5:1);
+  // позиционирование = сумма выбранных ячеек матрицы (по формату), ×периодов ×срок
   let posRaw=0; const posBreak={};
   S.slotsStd.forEach(idx=>{const f=MATRIX.std.slots[idx][4];posRaw+=posFee(f);posBreak[f]=(posBreak[f]||0)+1;});
   S.slotsSouth.forEach(idx=>{const f=MATRIX.south.slots[idx][4];posRaw+=posFee(f);posBreak[f]=(posBreak[f]||0)+1;});
-  posRaw*=S.standsPeriods;
+  posRaw*=S.standsPeriods*df;
   const posSum=S.posAll?posRaw:0;
 
   const st=[]; let standsItems=0,standsContacts=0,standsRes=0,standsUnits=0,giftStands=0;
   S.stands.forEach((f,i)=>{
     const r=DATA.stands[i], price=r.p[f]; if(price==null)return;
     const gift=S.standsGifts.has(i);
-    const line=gift?0:price*S.standsPeriods, contacts=r.res*V*S.standsPeriods;
+    const line=gift?0:price*S.standsPeriods*df, contacts=r.res*V*S.standsPeriods*df;
     standsItems+=line; standsContacts+=contacts; standsRes+=r.res; standsUnits+=r.count; if(gift)giftStands++;
     st.push({i,name:r.name,count:r.count,res:r.res,fmt:CFG.formats[f].label,fi:f,gift,
-      line,full:price*S.standsPeriods,contacts,cpc:(!gift&&r.res)?price/(r.res*V):0});
+      line,full:price*S.standsPeriods*df,contacts,cpc:(!gift&&r.res)?price/(r.res*V):0});
   });
   const standsBase=standsItems+posSum;
 
@@ -473,6 +482,8 @@ function posBreakText(b){const o=Object.keys(b).filter(k=>b[k]);return o.length?
 function render(){
   renderPlace();
   const r=calc();
+  // подсказка про период зависит от срока (30/15 дней)
+  $("#periodHint").textContent = S.standsDays===15 ? "(1 период = 15 дней, ½ цены)" : "(1 период = 30 дней, −7 дней в подарок)";
   // блок позиционирования
   $("#posCheck").classList.toggle("sel",S.posAll);
   $("#posPrice").textContent="+"+fmt(r.posSum)+" ₽";
@@ -564,7 +575,7 @@ function tgText(){
     L.push("\n🖼️ Стенды в лифтах");
     L.push(alignTable(r.st.map(x=>{const t=priceTriple(x,r.standsDisc);return [x.name, x.fmt, wStend(x.count), t[0], t[1], t[2]];}),["L","L","L","R","R","L"]));
     if(r.posSum)L.push("⭐ Позиционирование ("+posBreakText(r.posBreak)+"): +"+fmt(r.posSum)+" ₽");
-    if(S.standsPeriods>1)L.push("Срок: "+S.standsPeriods+" × 30 дней");
+    if(S.standsPeriods>1||S.standsDays===15)L.push("Срок: "+S.standsPeriods+" × "+(S.standsDays===15?"15":"30")+" дней");
     if(r.standsDisc>0)L.push("Скидка на стенды "+r.standsDisc+"%: −"+fmt(r.standsDiscSum)+" ₽");
   }
   if(r.sc.length){
@@ -675,7 +686,7 @@ function buildPrint(){
         <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,dS)}</td></tr>`).join("")+
       (r.posSum?`<tr><td style="${td}" colspan="4">⭐ Позиционирование на плакате (${posBreakText(r.posBreak)})</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.posSum,dS)}</td></tr>`:"")+`</table>`;
     if(r.giftStands>0)standsHtml+=`<div style="color:#1a9e6c;font-size:12px">🎁 Акция: ${r.giftStands} ${plural(r.giftStands,"район","района","районов")} в подарок.</div>`;
-    if(S.standsPeriods>1)standsHtml+=`<div style="color:#666;font-size:12px">Срок: ${S.standsPeriods} × 30 дней (−7 дней в подарок на период).</div>`;
+    if(S.standsPeriods>1||S.standsDays===15)standsHtml+=`<div style="color:#666;font-size:12px">Срок: ${S.standsPeriods} × ${S.standsDays===15?'15':'30'} дней${S.standsDays===30?' (−7 дней в подарок на период)':''}.</div>`;
     // позиционирование (матрица) + фото «как выглядит реклама» — в один ряд, одного размера
     const PH=190; // одинаковая высота матрицы и фото в PDF
     const matH=svg=>svg.replace("<svg ",`<svg style="height:${PH}px;width:auto" `);
@@ -979,6 +990,12 @@ function bind(){
   $("#sfera").addEventListener("change",e=>{S.sfera=e.target.value;S.pics.clear();renderThumbs();render();});
   $("#thumbs").addEventListener("click",e=>{const t=e.target.closest("[data-pic]");if(!t)return;
     const idx=+t.dataset.pic;S.pics.has(idx)?S.pics.delete(idx):S.pics.add(idx);renderThumbs();});
+
+  // срок размещения по стендам: 30 / 15 дней
+  document.addEventListener("click",e=>{const b=e.target.closest("[data-days]");if(!b)return;
+    S.standsDays=+b.dataset.days;
+    document.querySelectorAll("[data-days]").forEach(x=>x.classList.toggle("sel",+x.dataset.days===S.standsDays));
+    render();});
 
   $("#discStands").addEventListener("input",e=>{S.standsDiscount=+e.target.value||0;render();});
   $("#discScreens").addEventListener("input",e=>{S.screensDiscount=+e.target.value||0;render();});
