@@ -172,14 +172,7 @@
             <div class="hint">Отметьте район → выберите формат. У каждого района может быть свой формат.</div>
           </div>
           <div class="field">
-            <label class="lbl">Срок размещения по стендам</label>
-            <div class="opts">
-              <span class="opt sel" data-days="30">30 дней<br><span class="mini">7 дней в подарок</span></span>
-              <span class="opt" data-days="15">15 дней<br><span class="mini">½ цены</span></span>
-            </div>
-          </div>
-          <div class="field">
-            <label class="lbl">Количество месяцев размещения <span class="mini" id="periodHint">(1 месяц = 30 дней, −7 дней в подарок)</span></label>
+            <label class="lbl">Количество месяцев размещения <span class="mini">(1 месяц = 30 дней, −7 дней в подарок)</span></label>
             <div class="stepper"><button type="button" data-step="standsPeriods,-1">−</button>
               <input type="number" id="standsPeriods" value="1" min="1"><button type="button" data-step="standsPeriods,1">+</button></div>
           </div>
@@ -326,7 +319,7 @@ const S={
   posAll:false,
   screens:new Set(),       // "g|i"
   screensGifts:new Set(),  // "g|i" (ЖК в подарок)
-  intensity:0, screensMonths:1, standsPeriods:1, standsDays:30,
+  intensity:0, screensMonths:1, standsPeriods:1,
   video:false, videoFix:0,
   standsDiscount:0, screensDiscount:0,
   sfera:"", pics:new Set(),
@@ -429,32 +422,29 @@ function renderThumbs(){
 
 /* ---------- РАСЧЁТ ---------- */
 function calc(){
-  // множитель срока по стендам: 30 дней = 1, 15 дней = 0.5. Делится только ЦЕНА;
-  // охват «в день/в месяц» — это ставка (жители×2 в день), от срока не зависит.
-  const df=(S.standsDays===15?0.5:1);
-  // позиционирование = сумма выбранных ячеек матрицы (по формату), ×периодов ×срок
+  // позиционирование = сумма выбранных ячеек матрицы (по формату), ×периодов
   let posRaw=0; const posBreak={};
   S.slotsStd.forEach(idx=>{const f=MATRIX.std.slots[idx][4];posRaw+=posFee(f);posBreak[f]=(posBreak[f]||0)+1;});
   S.slotsSouth.forEach(idx=>{const f=MATRIX.south.slots[idx][4];posRaw+=posFee(f);posBreak[f]=(posBreak[f]||0)+1;});
-  posRaw*=S.standsPeriods*df;
+  posRaw*=S.standsPeriods;
   const posSum=S.posAll?posRaw:0;
 
-  const st=[]; let standsItems=0,standsContacts=0,standsExpo=0,standsRes=0,standsUnits=0,giftStands=0;
+  const st=[]; let standsItems=0,standsContacts=0,standsRes=0,standsUnits=0,giftStands=0;
   S.stands.forEach((f,i)=>{
     const r=DATA.stands[i], price=r.p[f]; if(price==null)return;
     const gift=S.standsGifts.has(i);
-    const line=gift?0:price*S.standsPeriods*df, contacts=r.res*V*S.standsPeriods;  // охват — БЕЗ df (ставка/мес)
-    standsItems+=line; standsContacts+=contacts; standsExpo+=contacts*df; standsRes+=r.res; standsUnits+=r.count; if(gift)giftStands++;
+    const line=gift?0:price*S.standsPeriods, contacts=r.res*V*S.standsPeriods;
+    standsItems+=line; standsContacts+=contacts; standsRes+=r.res; standsUnits+=r.count; if(gift)giftStands++;
     st.push({i,name:r.name,count:r.count,res:r.res,fmt:CFG.formats[f].label,fi:f,gift,
-      line,full:price*S.standsPeriods*df,contacts:contacts*df,cpc:(!gift&&r.res)?price/(r.res*V):0});
+      line,full:price*S.standsPeriods,contacts,cpc:(!gift&&r.res)?price/(r.res*V):0});
   });
   const standsBase=standsItems+posSum;
 
-  const sc=[]; let scItems=0,scContacts=0,scExpo=0,scRes=0,scUnits=0,giftScreens=0;
+  const sc=[]; let scItems=0,scContacts=0,scRes=0,scUnits=0,giftScreens=0;
   S.screens.forEach(key=>{const[gi,ii]=key.split("|").map(Number); const r=DATA.screens[gi].items[ii];
     const gift=S.screensGifts.has(key);
     const pm=r.p[S.intensity], line=gift?0:pm*S.screensMonths, contacts=r.res*V*S.screensMonths;
-    scItems+=line; scContacts+=contacts; scExpo+=contacts; scRes+=r.res; scUnits+=r.count; if(gift)giftScreens++;
+    scItems+=line; scContacts+=contacts; scRes+=r.res; scUnits+=r.count; if(gift)giftScreens++;
     sc.push({key,name:r.name,count:r.count,res:r.res,gift,line,full:pm*S.screensMonths,contacts,cpc:(!gift&&r.res)?pm/(r.res*V):0});});
   let videoCost=0;
   if(S.screens.size){ if(S.video)videoCost+=CFG.video.make; if(S.videoFix>0)videoCost+=CFG.video.fix*S.videoFix; }
@@ -467,16 +457,15 @@ function calc(){
   if(dC>0) scDiscSum=scBase-rnd50(scBase-scDiscSum);
   const base=standsBase+scBase, discSum=standsDiscSum+scDiscSum, total=base-discSum;
   const contacts=standsContacts+scContacts, totalRes=standsRes+scRes;
-  const exposures=standsExpo+scExpo;   // экспозиции с учётом срока — только для стоимости 1 контакта
   // цена без акций и скидок: все позиции по полной (подарки тоже), позиционирование и видео те же
   const fullStands=st.reduce((a,x)=>a+x.full,0)+posSum;
   const fullScreens=sc.reduce((a,x)=>a+x.full,0)+videoCost;
   const fullNoPromo=fullStands+fullScreens;
   const benefit=fullNoPromo-total;        // выгода клиента
-  return {st,sc,standsBase,scBase,videoCost,base,discSum,total,contacts,exposures,totalRes,
+  return {st,sc,standsBase,scBase,videoCost,base,discSum,total,contacts,totalRes,
     standsUnits,scUnits,giftStands,giftScreens,posRaw,posSum,posBreak,
     fullNoPromo,benefit,
-    standsDisc:dS,screensDisc:dC,standsDiscSum,scDiscSum,cpc:exposures?total/exposures:0};
+    standsDisc:dS,screensDisc:dC,standsDiscSum,scDiscSum,cpc:contacts?total/contacts:0};
 }
 
 /* ---------- СВОДКА ---------- */
@@ -484,8 +473,6 @@ function posBreakText(b){const o=Object.keys(b).filter(k=>b[k]);return o.length?
 function render(){
   renderPlace();
   const r=calc();
-  // подсказка про период зависит от срока (30/15 дней)
-  $("#periodHint").textContent = S.standsDays===15 ? "(1 = 15 дней, ½ месяца)" : "(1 месяц = 30 дней, −7 дней в подарок)";
   // блок позиционирования
   $("#posCheck").classList.toggle("sel",S.posAll);
   $("#posPrice").textContent="+"+fmt(r.posSum)+" ₽";
@@ -522,7 +509,7 @@ function render(){
     if(r.standsUnits)mb+=mrow("Стендов в охвате",fmt(r.standsUnits));
     if(r.scUnits)mb+=mrow("Экранов в охвате",fmt(r.scUnits));
     mb+=mrow("Покупателей (жителей)",fmt(r.totalRes));
-    mb+=mrow("Зрительных контактов в месяц",fmt(r.exposures));
+    mb+=mrow("Зрительных контактов в месяц",fmt(r.contacts));
     mb+=mrow("Зрительных контактов в день",fmt(r.contacts/30));
     mb+=mrow("Стоимость 1 контакта",fmt2(r.cpc)+" ₽");
     mb+=`</div>`;
@@ -577,7 +564,7 @@ function tgText(){
     L.push("\n🖼️ Стенды в лифтах");
     L.push(alignTable(r.st.map(x=>{const t=priceTriple(x,r.standsDisc);return [x.name, x.fmt, wStend(x.count), t[0], t[1], t[2]];}),["L","L","L","R","R","L"]));
     if(r.posSum)L.push("⭐ Позиционирование ("+posBreakText(r.posBreak)+"): +"+fmt(r.posSum)+" ₽");
-    if(S.standsPeriods>1||S.standsDays===15)L.push("Срок: "+S.standsPeriods+" × "+(S.standsDays===15?"15":"30")+" дней");
+    if(S.standsPeriods>1)L.push("Срок: "+S.standsPeriods+" × 30 дней");
     if(r.standsDisc>0)L.push("Скидка на стенды "+r.standsDisc+"%: −"+fmt(r.standsDiscSum)+" ₽");
   }
   if(r.sc.length){
@@ -601,7 +588,7 @@ function tgText(){
   }
   if(r.contacts>0){
     L.push("\n📊 Покупателей: "+fmt(r.totalRes));
-    L.push("👁️ Зрительных контактов в месяц: "+fmt(r.exposures)+" (в день: "+fmt(r.contacts/30)+")");
+    L.push("👁️ Зрительных контактов в месяц: "+fmt(r.contacts)+" (в день: "+fmt(r.contacts/30)+")");
     L.push("🎯 Стоимость 1 контакта: "+fmt2(r.cpc)+" ₽");
   }
   if(S.sfera!==""&&S.pics.size){
@@ -688,7 +675,7 @@ function buildPrint(){
         <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,dS)}</td></tr>`).join("")+
       (r.posSum?`<tr><td style="${td}" colspan="4">⭐ Позиционирование на плакате (${posBreakText(r.posBreak)})</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.posSum,dS)}</td></tr>`:"")+`</table>`;
     if(r.giftStands>0)standsHtml+=`<div style="color:#1a9e6c;font-size:12px">🎁 Акция: ${r.giftStands} ${plural(r.giftStands,"район","района","районов")} в подарок.</div>`;
-    if(S.standsPeriods>1||S.standsDays===15)standsHtml+=`<div style="color:#666;font-size:12px">Срок: ${S.standsPeriods} × ${S.standsDays===15?'15':'30'} дней${S.standsDays===30?' (−7 дней в подарок на период)':''}.</div>`;
+    if(S.standsPeriods>1)standsHtml+=`<div style="color:#666;font-size:12px">Срок: ${S.standsPeriods} × 30 дней (−7 дней в подарок на период).</div>`;
     // позиционирование (матрица) + фото «как выглядит реклама» — в один ряд, одного размера
     const PH=190; // одинаковая высота матрицы и фото в PDF
     const matH=svg=>svg.replace("<svg ",`<svg style="height:${PH}px;width:auto" `);
@@ -748,7 +735,7 @@ function buildPrint(){
         <div style="font-size:24px;font-weight:900;color:#1a9e6c">−${fmt(r.benefit)} ₽</div></div>
     </div>${(r.giftStands+r.giftScreens)>0?`<div style="color:#1a9e6c;font-size:12px;margin-top:6px">🎁 В выгоду входят бесплатные размещения по акции${(r.standsDiscSum+r.scDiscSum)>0?' и скидки':''}.</div>`:""}`:""}
     ${r.contacts>0?`<div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;page-break-inside:avoid;break-inside:avoid">
-      ${mediaCard("Зрительных контактов в месяц",fmt(r.exposures))}
+      ${mediaCard("Зрительных контактов в месяц",fmt(r.contacts))}
       ${mediaCard("Зрительных контактов в день",fmt(r.contacts/30))}
       ${mediaCard("Покупателей (всего)",fmt(r.totalRes))}
       ${mediaCard("Стоимость 1 контакта",fmt2(r.cpc)+" ₽")}
@@ -992,12 +979,6 @@ function bind(){
   $("#sfera").addEventListener("change",e=>{S.sfera=e.target.value;S.pics.clear();renderThumbs();render();});
   $("#thumbs").addEventListener("click",e=>{const t=e.target.closest("[data-pic]");if(!t)return;
     const idx=+t.dataset.pic;S.pics.has(idx)?S.pics.delete(idx):S.pics.add(idx);renderThumbs();});
-
-  // срок размещения по стендам: 30 / 15 дней
-  document.addEventListener("click",e=>{const b=e.target.closest("[data-days]");if(!b)return;
-    S.standsDays=+b.dataset.days;
-    document.querySelectorAll("[data-days]").forEach(x=>x.classList.toggle("sel",+x.dataset.days===S.standsDays));
-    render();});
 
   $("#discStands").addEventListener("input",e=>{S.standsDiscount=+e.target.value||0;render();});
   $("#discScreens").addEventListener("input",e=>{S.screensDiscount=+e.target.value||0;render();});
