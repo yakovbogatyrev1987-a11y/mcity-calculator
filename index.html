@@ -164,6 +164,14 @@
           <span class="toggle" id="tgStands">свернуть ▲</span></div>
         <div class="bd" id="bdStands">
           <div class="field">
+            <label class="lbl">Срок размещения по стендам</label>
+            <div class="opts">
+              <span class="opt sel" data-mm="1">1 месяц<br><span class="mini">стандарт</span></span>
+              <span class="opt" data-mm="2">2 месяца<br><span class="mini">акция</span></span>
+            </div>
+          </div>
+          <div class="field">
+            <label class="lbl" id="lblM1" style="display:none">🗓️ Месяц 1 — районы</label>
             <div class="toolbar">
               <input type="text" id="standsSearch" placeholder="Поиск района…">
               <button type="button" data-act="clear-stands">Сброс</button>
@@ -171,14 +179,26 @@
             <div class="listbox" id="standsList"></div>
             <div class="hint">Отметьте район → выберите формат. У каждого района может быть свой формат.</div>
           </div>
-          <div class="field">
+          <div class="field" id="fieldM2" style="display:none">
+            <label class="lbl">🗓️ Месяц 2 — районы <button type="button" class="mini" data-act="copy-m2" style="background:none;border:none;color:var(--accent-2);cursor:pointer">← скопировать из месяца 1</button></label>
+            <div class="toolbar">
+              <input type="text" id="standsSearch2" placeholder="Поиск района…">
+              <button type="button" data-act="clear-stands2">Сброс</button>
+            </div>
+            <div class="listbox" id="standsList2"></div>
+          </div>
+          <div class="field" id="fieldPeriods">
             <label class="lbl">Количество месяцев размещения <span class="mini">(1 месяц = 30 дней, −7 дней в подарок)</span></label>
             <div class="stepper"><button type="button" data-step="standsPeriods,-1">−</button>
               <input type="number" id="standsPeriods" value="1" min="1"><button type="button" data-step="standsPeriods,1">+</button></div>
           </div>
           <div class="field">
-            <label class="lbl">Скидка на стенды, %</label>
+            <label class="lbl" id="lblDisc1">Скидка на стенды, %</label>
             <input type="number" id="discStands" value="0" min="0" max="50">
+          </div>
+          <div class="field" id="fieldDisc2" style="display:none">
+            <label class="lbl">Скидка на стенды · месяц 2, %</label>
+            <input type="number" id="discStands2" value="0" min="0" max="50">
           </div>
         </div>
       </div>
@@ -313,8 +333,12 @@ const MATRIX={
 };
 
 const S={
-  stands:new Map(),        // i -> formatIndex
-  standsGifts:new Set(),   // i (район в подарок)
+  stands:new Map(),        // i -> formatIndex (месяц 1)
+  standsGifts:new Set(),   // i (район в подарок, месяц 1)
+  stands2m:false,          // акция «2 месяца»
+  standsM2:new Map(),      // i -> formatIndex (месяц 2)
+  standsGiftsM2:new Set(), // i (район в подарок, месяц 2)
+  standsDiscount2:0,       // скидка на месяц 2, %
   slotsStd:new Set(), slotsSouth:new Set(),  // выбранные ячейки матрицы
   posAll:false,
   screens:new Set(),       // "g|i"
@@ -357,28 +381,41 @@ function buildUI(){
     <div class="t">${t.label}</div><div class="s">${t.sub}</div></div>`).join("");
   $("#sfera").innerHTML='<option value="">— выберите сферу —</option>'+
     SFERI.map((s,i)=>`<option value="${i}">${s.name} (${s.count})</option>`).join("");
-  renderStands(); renderScreens(); renderPlace();
+  renderStands("",1); renderStands("",2); renderScreens(); renderPlace(); updateStandsMode();
 }
 
-function renderStands(q=""){
+function stMap(m){return m===2?S.standsM2:S.stands;}
+function stGifts(m){return m===2?S.standsGiftsM2:S.standsGifts;}
+function searchFor(m){return $(m===2?"#standsSearch2":"#standsSearch").value;}
+function renderStands(q="",m=1){
   q=q.trim().toLowerCase();
+  const map=stMap(m), gifts=stGifts(m);
   const rows=DATA.stands.map((r,i)=>({r,i})).filter(o=>!q||o.r.name.toLowerCase().includes(q));
-  $("#standsList").innerHTML=rows.map(({r,i})=>{
-    const sel=S.stands.has(i), f=S.stands.get(i);
+  $(m===2?"#standsList2":"#standsList").innerHTML=rows.map(({r,i})=>{
+    const sel=map.has(i), f=map.get(i);
     const price=sel?r.p[f]:null;
     const fmtBtns=CFG.formats.map((ff,fi)=>{const na=r.p[fi]==null;
-      return `<div class="fmtbtn ${f===fi&&!na?'sel':''} ${na?'na':''}" data-fmtfor="${i}" data-f="${fi}">
+      return `<div class="fmtbtn ${f===fi&&!na?'sel':''} ${na?'na':''}" data-fmtfor="${i}" data-f="${fi}" data-m="${m}">
         ${ff.label}<span class="p">${na?'—':fmt(r.p[fi])+'₽'}</span></div>`;}).join("");
-    const gift=S.standsGifts.has(i);
+    const gift=gifts.has(i);
     const body=sel?`<div class="body"><div class="fmtrow">${fmtBtns}</div>
-      <div class="minirow"><span class="pillchk ${gift?'sel':''}" data-giftstand="${i}"><span class="b">${gift?'✓':''}</span>🎁 Район в подарок (0 ₽)</span></div></div>`:"";
+      <div class="minirow"><span class="pillchk ${gift?'sel':''}" data-giftstand="${i}" data-m="${m}"><span class="b">${gift?'✓':''}</span>🎁 Район в подарок (0 ₽)</span></div></div>`:"";
     const priceLabel=sel&&price!=null?(gift?'<br><b style="color:#36c08a">подарок</b>':'<br><b style="color:#e7eaf0">'+fmt(price)+' ₽</b>'):'';
-    return `<div class="it ${sel?'sel':''}" data-stand="${i}"><div class="head">
+    return `<div class="it ${sel?'sel':''}" data-stand="${i}" data-m="${m}"><div class="head">
       <span class="chk">${sel?'✓':''}</span><span class="nm">${r.name}</span>
       <span class="meta">${wStend(r.count)}<br>${r.res?wBuyer(r.res):''}${priceLabel}</span>
       </div>${body}</div>`;
   }).join("");
-  $("#cntStands").textContent=S.stands.size;
+  $("#cntStands").textContent=S.stands.size+(S.stands2m?S.standsM2.size:0);
+}
+function updateStandsMode(){
+  const two=S.stands2m;
+  document.querySelectorAll("[data-mm]").forEach(x=>x.classList.toggle("sel",(+x.dataset.mm===2)===two));
+  $("#lblM1").style.display=two?"":"none";
+  $("#fieldM2").style.display=two?"":"none";
+  $("#fieldDisc2").style.display=two?"":"none";
+  $("#fieldPeriods").style.display=two?"none":"";
+  $("#lblDisc1").textContent=two?"Скидка на стенды · месяц 1, %":"Скидка на стенды, %";
 }
 
 function renderScreens(q=""){
@@ -422,23 +459,46 @@ function renderThumbs(){
 
 /* ---------- РАСЧЁТ ---------- */
 function calc(){
-  // позиционирование = сумма выбранных ячеек матрицы (по формату), ×периодов
+  // позиционирование = сумма выбранных ячеек матрицы (по формату)
   let posRaw=0; const posBreak={};
   S.slotsStd.forEach(idx=>{const f=MATRIX.std.slots[idx][4];posRaw+=posFee(f);posBreak[f]=(posBreak[f]||0)+1;});
   S.slotsSouth.forEach(idx=>{const f=MATRIX.south.slots[idx][4];posRaw+=posFee(f);posBreak[f]=(posBreak[f]||0)+1;});
-  posRaw*=S.standsPeriods;
+  posRaw*=S.stands2m?1:S.standsPeriods;   // в акции «2 месяца» позиционирование считаем за 1 месяц
   const posSum=S.posAll?posRaw:0;
 
-  const st=[]; let standsItems=0,standsContacts=0,standsRes=0,standsUnits=0,giftStands=0;
-  S.stands.forEach((f,i)=>{
-    const r=DATA.stands[i], price=r.p[f]; if(price==null)return;
-    const gift=S.standsGifts.has(i);
-    const line=gift?0:price*S.standsPeriods, contacts=r.res*V*S.standsPeriods;
-    standsItems+=line; standsContacts+=contacts; standsRes+=r.res; standsUnits+=r.count; if(gift)giftStands++;
-    st.push({i,name:r.name,count:r.count,res:r.res,fmt:CFG.formats[f].label,fi:f,gift,
-      line,full:price*S.standsPeriods,contacts,cpc:(!gift&&r.res)?price/(r.res*V):0});
-  });
-  const standsBase=standsItems+posSum;
+  // расчёт стендов по одной выборке (месяцу)
+  function standsGroup(map,gifts,periods){
+    const st=[]; let items=0,contacts=0,res=0,units=0,giftN=0;
+    map.forEach((f,i)=>{
+      const r=DATA.stands[i], price=r.p[f]; if(price==null)return;
+      const gift=gifts.has(i);
+      const line=gift?0:price*periods, c=r.res*V*periods;
+      items+=line; contacts+=c; res+=r.res; units+=r.count; if(gift)giftN++;
+      st.push({i,name:r.name,count:r.count,res:r.res,fmt:CFG.formats[f].label,fi:f,gift,
+        line,full:price*periods,contacts:c,cpc:(!gift&&r.res)?price/(r.res*V):0});
+    });
+    return {st,items,contacts,res,units,giftN};
+  }
+  const discCalc=(bs,pct)=>{const d=Math.min(50,Math.max(0,pct||0));let s=bs*d/100;if(d>0)s=bs-rnd50(bs-s);return{d,s};};
+
+  let st, standsContacts, standsRes, standsUnits, giftStands, standsBase, standsDiscSum, dS, stM=null;
+  if(!S.stands2m){
+    const g=standsGroup(S.stands,S.standsGifts,S.standsPeriods);
+    st=g.st; standsContacts=g.contacts; standsRes=g.res; standsUnits=g.units; giftStands=g.giftN;
+    standsBase=g.items+posSum;
+    const d=discCalc(standsBase,S.standsDiscount); dS=d.d; standsDiscSum=d.s;
+  } else {
+    const g1=standsGroup(S.stands,S.standsGifts,1), g2=standsGroup(S.standsM2,S.standsGiftsM2,1);
+    const base1=g1.items+posSum, base2=g2.items;
+    const d1=discCalc(base1,S.standsDiscount), d2=discCalc(base2,S.standsDiscount2);
+    stM=[{label:"Месяц 1",st:g1.st,base:base1,disc:d1.d,discSum:d1.s,posSum:posSum,giftN:g1.giftN},
+         {label:"Месяц 2",st:g2.st,base:base2,disc:d2.d,discSum:d2.s,posSum:0,giftN:g2.giftN}];
+    st=g1.st.concat(g2.st);
+    standsBase=base1+base2; standsDiscSum=d1.s+d2.s; dS=0; giftStands=g1.giftN+g2.giftN;
+    standsContacts=g1.contacts+g2.contacts;
+    const uni=new Map(); S.stands.forEach((f,i)=>uni.set(i,1)); S.standsM2.forEach((f,i)=>uni.set(i,1));
+    standsRes=0; standsUnits=0; uni.forEach((_,i)=>{standsRes+=DATA.stands[i].res;standsUnits+=DATA.stands[i].count;});
+  }
 
   const sc=[]; let scItems=0,scContacts=0,scRes=0,scUnits=0,giftScreens=0;
   S.screens.forEach(key=>{const[gi,ii]=key.split("|").map(Number); const r=DATA.screens[gi].items[ii];
@@ -450,10 +510,9 @@ function calc(){
   if(S.screens.size){ if(S.video)videoCost+=CFG.video.make; if(S.videoFix>0)videoCost+=CFG.video.fix*S.videoFix; }
   const scBase=scItems+videoCost;
 
-  const dS=Math.min(50,Math.max(0,S.standsDiscount||0)), dC=Math.min(50,Math.max(0,S.screensDiscount||0));
-  // сумма скидки такая, чтобы цена ПОСЛЕ скидки была ровной (округляем вверх до 50)
-  let standsDiscSum=standsBase*dS/100, scDiscSum=scBase*dC/100;
-  if(dS>0) standsDiscSum=standsBase-rnd50(standsBase-standsDiscSum);
+  const dC=Math.min(50,Math.max(0,S.screensDiscount||0));
+  // скидка на экраны: цена ПОСЛЕ скидки округляется вверх до 50 (стенды уже посчитаны выше)
+  let scDiscSum=scBase*dC/100;
   if(dC>0) scDiscSum=scBase-rnd50(scBase-scDiscSum);
   const base=standsBase+scBase, discSum=standsDiscSum+scDiscSum, total=base-discSum;
   const contacts=standsContacts+scContacts, totalRes=standsRes+scRes;
@@ -462,7 +521,7 @@ function calc(){
   const fullScreens=sc.reduce((a,x)=>a+x.full,0)+videoCost;
   const fullNoPromo=fullStands+fullScreens;
   const benefit=fullNoPromo-total;        // выгода клиента
-  return {st,sc,standsBase,scBase,videoCost,base,discSum,total,contacts,totalRes,
+  return {st,sc,stM,twoM:S.stands2m,standsBase,scBase,videoCost,base,discSum,total,contacts,totalRes,
     standsUnits,scUnits,giftStands,giftScreens,posRaw,posSum,posBreak,
     fullNoPromo,benefit,
     standsDisc:dS,screensDisc:dC,standsDiscSum,scDiscSum,cpc:contacts?total/contacts:0};
@@ -488,7 +547,14 @@ function render(){
   const giftTag=x=>x.gift?' <span style="color:var(--ok)">🎁</span>':'';
   const val=x=>x.gift?'<span style="color:var(--ok)">подарок</span>':fmt(x.line)+' ₽';
   let h="";
-  if(r.st.length){
+  if(r.stM){   // акция «2 месяца» — два блока
+    r.stM.forEach((M,mi)=>{ if(!M.st.length)return;
+      h+=`<div class="sblock"><div class="bt">Стенды · ${M.label}</div>`+
+        M.st.map(x=>`<div class="sline"><span class="k">${x.name} · ${x.fmt}${giftTag(x)}</span><span class="v">${val(x)}</span></div>`).join("")+
+        (mi===0&&r.posSum?`<div class="sline"><span class="k">⭐ Позиционирование (${bt})</span><span class="v">${fmt(r.posSum)} ₽</span></div>`:"")+
+        (M.disc>0?`<div class="sline disc"><span class="k">Скидка ${M.disc}%</span><span class="v">−${fmt(M.discSum)} ₽</span></div>`:"")+`</div>`;
+    });
+  } else if(r.st.length){
     h+=`<div class="sblock"><div class="bt">Стенды</div>`+
       r.st.map(x=>`<div class="sline"><span class="k">${x.name} · ${x.fmt}${giftTag(x)}</span><span class="v">${val(x)}</span></div>`).join("")+
       (r.posSum?`<div class="sline"><span class="k">⭐ Позиционирование (${bt})</span><span class="v">${fmt(r.posSum)} ₽</span></div>`:"")+
@@ -560,7 +626,15 @@ function tgText(){
   L.push("Добрый день — составила для вас индивидуальное предложение с учётом пожеланий по охватам и расположению вашего бизнеса.");
   if(S.client)L.push("Для: "+S.client);
 
-  if(r.st.length){
+  if(r.stM){   // акция «2 месяца»
+    L.push("\n🖼️ Стенды в лифтах · акция на 2 месяца");
+    r.stM.forEach((M,mi)=>{ if(!M.st.length)return;
+      L.push("\n🗓️ "+M.label+":");
+      L.push(alignTable(M.st.map(x=>{const t=priceTriple(x,M.disc);return [x.name, x.fmt, wStend(x.count), t[0], t[1], t[2]];}),["L","L","L","R","R","L"]));
+      if(mi===0&&r.posSum)L.push("⭐ Позиционирование ("+posBreakText(r.posBreak)+"): +"+fmt(r.posSum)+" ₽");
+      if(M.disc>0)L.push("Скидка "+M.disc+"%: −"+fmt(M.discSum)+" ₽");
+    });
+  } else if(r.st.length){
     L.push("\n🖼️ Стенды в лифтах");
     L.push(alignTable(r.st.map(x=>{const t=priceTriple(x,r.standsDisc);return [x.name, x.fmt, wStend(x.count), t[0], t[1], t[2]];}),["L","L","L","R","R","L"]));
     if(r.posSum)L.push("⭐ Позиционирование ("+posBreakText(r.posBreak)+"): +"+fmt(r.posSum)+" ₽");
@@ -662,20 +736,29 @@ function buildPrint(){
 
   const stdSel=r.st.some(x=>!isSouth(x.i)), southSel=r.st.some(x=>isSouth(x.i));
 
-  let standsHtml="";
-  if(r.st.length){
-    standsHtml+=sec("Стенды в лифтах");
-    standsHtml+=`<table style="width:100%;border-collapse:collapse;margin-bottom:6px">
+  const standsRows=(list,disc,withPos)=>`<table style="width:100%;border-collapse:collapse;margin-bottom:6px">
       <tr><th style="${th}">Локация</th><th style="${th}">Формат</th><th style="${th};text-align:right">Покупателей</th>
       <th style="${th};text-align:right">Контактов/мес</th><th style="${th};text-align:right">Стоимость</th></tr>`+
-      r.st.map(x=>`<tr><td style="${td}">${x.name}<br><span style="color:#888;font-size:11px">${wStend(x.count)}</span></td>
+      list.map(x=>`<tr><td style="${td}">${x.name}<br><span style="color:#888;font-size:11px">${wStend(x.count)}</span></td>
         <td style="${td};font-weight:700">${x.fmt}${x.gift?' <span style="color:#1a9e6c">🎁</span>':''}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.res):'—'}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.contacts):'—'}</td>
-        <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,dS)}</td></tr>`).join("")+
-      (r.posSum?`<tr><td style="${td}" colspan="4">⭐ Позиционирование на плакате (${posBreakText(r.posBreak)})</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.posSum,dS)}</td></tr>`:"")+`</table>`;
-    if(r.giftStands>0)standsHtml+=`<div style="color:#1a9e6c;font-size:12px">🎁 Акция: ${r.giftStands} ${plural(r.giftStands,"район","района","районов")} в подарок.</div>`;
-    if(S.standsPeriods>1)standsHtml+=`<div style="color:#666;font-size:12px">Срок: ${S.standsPeriods} × 30 дней (−7 дней в подарок на период).</div>`;
+        <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,disc)}</td></tr>`).join("")+
+      (withPos&&r.posSum?`<tr><td style="${td}" colspan="4">⭐ Позиционирование на плакате (${posBreakText(r.posBreak)})</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.posSum,disc)}</td></tr>`:"")+`</table>`;
+  let standsHtml="";
+  if(r.st.length){
+    if(r.stM){
+      standsHtml+=sec("Стенды в лифтах · акция на 2 месяца");
+      r.stM.forEach((M,mi)=>{ if(!M.st.length)return;
+        standsHtml+=`<div style="font-weight:800;font-size:14px;margin:12px 0 4px">🗓️ ${M.label}</div>`+standsRows(M.st,M.disc,mi===0);
+        if(M.disc>0)standsHtml+=`<div style="color:${RED};font-size:12px;margin-bottom:6px">Скидка ${M.disc}%: −${fmt(M.discSum)} ₽</div>`;
+      });
+      if(r.giftStands>0)standsHtml+=`<div style="color:#1a9e6c;font-size:12px">🎁 Акция: ${r.giftStands} ${plural(r.giftStands,"район","района","районов")} в подарок.</div>`;
+    } else {
+      standsHtml+=sec("Стенды в лифтах")+standsRows(r.st,dS,true);
+      if(r.giftStands>0)standsHtml+=`<div style="color:#1a9e6c;font-size:12px">🎁 Акция: ${r.giftStands} ${plural(r.giftStands,"район","района","районов")} в подарок.</div>`;
+      if(S.standsPeriods>1)standsHtml+=`<div style="color:#666;font-size:12px">Срок: ${S.standsPeriods} × 30 дней (−7 дней в подарок на период).</div>`;
+    }
     // позиционирование (матрица) + фото «как выглядит реклама» — в один ряд, одного размера
     const PH=190; // одинаковая высота матрицы и фото в PDF
     const matH=svg=>svg.replace("<svg ",`<svg style="height:${PH}px;width:auto" `);
@@ -721,7 +804,7 @@ function buildPrint(){
   const totalHtml=`${sec("Стоимость и эффективность")}
     <table style="width:100%;border-collapse:collapse;font-size:15px">
       <tr><td style="${td}">Стоимость размещения</td><td style="${td};text-align:right">${fmt(r.base)} ₽</td></tr>
-      ${r.standsDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на стенды ${r.standsDisc}%</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.standsDiscSum)} ₽</td></tr>`:""}
+      ${r.standsDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на стенды${r.twoM?' (по месяцам)':' '+r.standsDisc+'%'}</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.standsDiscSum)} ₽</td></tr>`:""}
       ${r.scDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на экраны ${r.screensDisc}%</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.scDiscSum)} ₽</td></tr>`:""}
       <tr><td style="padding:12px 10px;border-top:2px solid #111;font-size:20px;font-weight:800">ИТОГО</td>
       <td style="padding:12px 10px;border-top:2px solid #111;font-size:20px;font-weight:800;text-align:right;color:${RED}">${fmt(r.total)} ₽</td></tr>
@@ -785,7 +868,8 @@ function buildPrint(){
         <td style="${aTot};text-align:right">${fmt(rs*V)}</td></tr>
       </table></div>`; };
   const hasADDR=typeof ADDR!=="undefined";
-  const standAddr=hasADDR?r.st.map(x=>ADDR.stands[x.name]?addrStandTable(x.name,ADDR.stands[x.name]):"").join(""):"";
+  const uniqStandNames=[...new Set(r.st.map(x=>x.name))];   // без дублей (в акции районы могут повторяться по месяцам)
+  const standAddr=hasADDR?uniqStandNames.map(nm=>ADDR.stands[nm]?addrStandTable(nm,ADDR.stands[nm]):"").join(""):"";
   const screenAddr=hasADDR?r.sc.map(x=>ADDR.screens[x.name]?addrScreenTable(x.name,ADDR.screens[x.name]):"").join(""):"";
   if(standAddr||screenAddr){
     addrHtml=sec("Адреса размещения и охват")+
@@ -917,21 +1001,31 @@ function bind(){
     if(tg)tg.textContent=open?"развернуть ▼":"свернуть ▲";
   }));
 
-  // стенды
-  $("#standsList").addEventListener("click",e=>{
+  // стенды (месяц 1 и месяц 2 — общий обработчик, месяц берём из data-m)
+  const onStandClick=e=>{
     const fb=e.target.closest("[data-fmtfor]");
-    if(fb){const i=+fb.dataset.fmtfor,f=+fb.dataset.f; if(DATA.stands[i].p[f]==null)return;
-      S.stands.set(i,f); renderStands($("#standsSearch").value); render(); return;}
+    if(fb){const i=+fb.dataset.fmtfor,f=+fb.dataset.f,m=+fb.dataset.m; if(DATA.stands[i].p[f]==null)return;
+      stMap(m).set(i,f); renderStands(searchFor(m),m); render(); return;}
     const gb=e.target.closest("[data-giftstand]");
-    if(gb){const i=+gb.dataset.giftstand; S.standsGifts.has(i)?S.standsGifts.delete(i):S.standsGifts.add(i);
-      renderStands($("#standsSearch").value); render(); return;}
+    if(gb){const i=+gb.dataset.giftstand,m=+gb.dataset.m; const g=stGifts(m); g.has(i)?g.delete(i):g.add(i);
+      renderStands(searchFor(m),m); render(); return;}
     const head=e.target.closest(".head");
-    if(head){const i=+head.closest("[data-stand]").dataset.stand;
-      if(S.stands.has(i)){S.stands.delete(i);S.standsGifts.delete(i);}
-      else{const def=DATA.stands[i].p[2]!=null?2:(DATA.stands[i].p[3]!=null?3:0);S.stands.set(i,def);}
-      renderStands($("#standsSearch").value);render();}
-  });
-  $("#standsSearch").addEventListener("input",e=>renderStands(e.target.value));
+    if(head){const it=head.closest("[data-stand]"); const i=+it.dataset.stand,m=+it.dataset.m; const map=stMap(m),g=stGifts(m);
+      if(map.has(i)){map.delete(i);g.delete(i);}
+      else{const def=DATA.stands[i].p[2]!=null?2:(DATA.stands[i].p[3]!=null?3:0);map.set(i,def);}
+      renderStands(searchFor(m),m);render();}
+  };
+  $("#standsList").addEventListener("click",onStandClick);
+  $("#standsList2").addEventListener("click",onStandClick);
+  $("#standsSearch").addEventListener("input",e=>renderStands(e.target.value,1));
+  $("#standsSearch2").addEventListener("input",e=>renderStands(e.target.value,2));
+  // переключатель 1/2 месяца
+  document.querySelectorAll("[data-mm]").forEach(el=>el.addEventListener("click",()=>{
+    const two=+el.dataset.mm===2;
+    if(two && S.stands2m===false && S.standsM2.size===0){ // при первом включении копируем месяц 1
+      S.stands.forEach((f,i)=>S.standsM2.set(i,f)); S.standsGifts.forEach(i=>S.standsGiftsM2.add(i)); }
+    S.stands2m=two; updateStandsMode(); renderStands(searchFor(2),2); render();
+  }));
 
   // матрица места
   $("#matrixBox").addEventListener("click",e=>{const c=e.target.closest("[data-slotfor]");if(!c)return;
@@ -961,7 +1055,9 @@ function bind(){
   // действия
   document.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b)return;
     const a=b.dataset.act;
-    if(a==="clear-stands"){S.stands.clear();S.standsGifts.clear();S.slotsStd.clear();S.slotsSouth.clear();renderStands($("#standsSearch").value);}
+    if(a==="clear-stands"){S.stands.clear();S.standsGifts.clear();S.slotsStd.clear();S.slotsSouth.clear();renderStands(searchFor(1),1);}
+    if(a==="clear-stands2"){S.standsM2.clear();S.standsGiftsM2.clear();renderStands(searchFor(2),2);}
+    if(a==="copy-m2"){S.standsM2.clear();S.standsGiftsM2.clear();S.stands.forEach((f,i)=>S.standsM2.set(i,f));S.standsGifts.forEach(i=>S.standsGiftsM2.add(i));renderStands(searchFor(2),2);}
     if(a==="clear-screens"){S.screens.clear();S.screensGifts.clear();renderScreens($("#screensSearch").value);}
     if(a==="pics-all"&&S.sfera!==""){SFERI[+S.sfera].imgs.forEach((_,i)=>S.pics.add(i));renderThumbs();}
     if(a==="pics-none"){S.pics.clear();renderThumbs();}
@@ -981,6 +1077,7 @@ function bind(){
     const idx=+t.dataset.pic;S.pics.has(idx)?S.pics.delete(idx):S.pics.add(idx);renderThumbs();});
 
   $("#discStands").addEventListener("input",e=>{S.standsDiscount=+e.target.value||0;render();});
+  $("#discStands2").addEventListener("input",e=>{S.standsDiscount2=+e.target.value||0;render();});
   $("#discScreens").addEventListener("input",e=>{S.screensDiscount=+e.target.value||0;render();});
 
   // ждём и ЗАГРУЗКУ, и ДЕКОДИРОВАНИЕ картинок — иначе печать ловит наполовину прорисованное фото
@@ -988,16 +1085,16 @@ function bind(){
     const loaded=(im.complete&&im.naturalWidth)?Promise.resolve():new Promise(res=>{im.onload=im.onerror=res;});
     return loaded.then(()=>im.decode?im.decode().catch(()=>{}):null);
   }));
-  $("#btnPdf").addEventListener("click",()=>{if(!S.stands.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
+  $("#btnPdf").addEventListener("click",()=>{if(!S.stands.size&&!S.standsM2.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
     buildPrint();
     const oldTitle=document.title; document.title=" ";   // убираем «M-CITY · Калькулятор…» из колонтитула печати
     const imgs=[...document.querySelectorAll("#printArea img")];
     Promise.race([imgsReady(imgs),new Promise(r=>setTimeout(r,15000))]).then(()=>{window.print(); document.title=oldTitle;});});
-  $("#btnWord").addEventListener("click",()=>{if(!S.stands.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
+  $("#btnWord").addEventListener("click",()=>{if(!S.stands.size&&!S.standsM2.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
     toast("Готовлю Word…"); buildPrint();
     const imgs=[...document.querySelectorAll("#printArea img")];
     Promise.race([imgsReady(imgs),new Promise(r=>setTimeout(r,15000))]).then(()=>exportWord().then(()=>toast("Word скачан ✓")).catch(()=>toast("Не удалось собрать Word")));});
-  $("#btnTg").addEventListener("click",async()=>{if(!S.stands.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
+  $("#btnTg").addEventListener("click",async()=>{if(!S.stands.size&&!S.standsM2.size&&!S.screens.size){toast("Сначала выберите размещение");return;}
     const txt=tgText();
     // Кладём и HTML (ссылка-слово для Telegram на ПК), и обычный текст (запасной, для телефона)
     try{
