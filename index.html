@@ -230,18 +230,34 @@
           <span class="toggle" id="tgScreens">свернуть ▲</span></div>
         <div class="bd" id="bdScreens">
           <div class="field">
+            <label class="lbl">Срок размещения по экранам</label>
+            <div class="opts">
+              <span class="opt sel" data-mms="1">1 месяц<br><span class="mini">стандарт</span></span>
+              <span class="opt" data-mms="2">2 месяца<br><span class="mini">акция</span></span>
+            </div>
+          </div>
+          <div class="field">
             <label class="lbl">Интенсивность показа</label>
             <div class="opts" id="intensity"></div>
             <div class="hint">Ролик до 10 сек. Чем выше интенсивность — тем чаще крутится ваше видео.</div>
           </div>
           <div class="field">
+            <label class="lbl" id="lblScrM1" style="display:none">🗓️ Месяц 1 — объекты</label>
             <div class="toolbar">
               <input type="text" id="screensSearch" placeholder="Поиск ЖК / БЦ…">
               <button type="button" data-act="clear-screens">Сброс</button>
             </div>
             <div class="listbox" id="screensList"></div>
           </div>
-          <div class="field">
+          <div class="field" id="fieldScrM2" style="display:none">
+            <label class="lbl">🗓️ Месяц 2 — объекты <button type="button" class="mini" data-act="copy-scrm2" style="background:none;border:none;color:var(--accent-2);cursor:pointer">← скопировать из месяца 1</button></label>
+            <div class="toolbar">
+              <input type="text" id="screensSearch2" placeholder="Поиск ЖК / БЦ…">
+              <button type="button" data-act="clear-screens2">Сброс</button>
+            </div>
+            <div class="listbox" id="screensList2"></div>
+          </div>
+          <div class="field" id="fieldScreensMonths">
             <label class="lbl">Количество месяцев</label>
             <div class="stepper"><button type="button" data-step="screensMonths,-1">−</button>
               <input type="number" id="screensMonths" value="1" min="1"><button type="button" data-step="screensMonths,1">+</button></div>
@@ -257,8 +273,12 @@
               <input type="number" id="videoFix" value="0" min="0"><button type="button" data-step="videoFix,1">+</button></div>
           </div>
           <div class="field">
-            <label class="lbl">Скидка на экраны, %</label>
+            <label class="lbl" id="lblDiscS1">Скидка на экраны, %</label>
             <input type="number" id="discScreens" value="0" min="0" max="50">
+          </div>
+          <div class="field" id="fieldDiscS2" style="display:none">
+            <label class="lbl">Скидка на экраны · месяц 2, %</label>
+            <input type="number" id="discScreens2" value="0" min="0" max="50">
           </div>
         </div>
       </div>
@@ -341,8 +361,12 @@ const S={
   standsDiscount2:0,       // скидка на месяц 2, %
   slotsStd:new Set(), slotsSouth:new Set(),  // выбранные ячейки матрицы
   posAll:false,
-  screens:new Set(),       // "g|i"
-  screensGifts:new Set(),  // "g|i" (ЖК в подарок)
+  screens:new Set(),       // "g|i" (месяц 1)
+  screensGifts:new Set(),  // "g|i" (ЖК в подарок, месяц 1)
+  screens2m:false,         // акция «2 месяца» по экранам
+  screensM2:new Set(),     // "g|i" (месяц 2)
+  screensGiftsM2:new Set(),// "g|i" (в подарок, месяц 2)
+  screensDiscount2:0,      // скидка на экраны, месяц 2, %
   intensity:0, screensMonths:1, standsPeriods:1,
   video:false, videoFix:0,
   standsDiscount:0, screensDiscount:0,
@@ -381,7 +405,7 @@ function buildUI(){
     <div class="t">${t.label}</div><div class="s">${t.sub}</div></div>`).join("");
   $("#sfera").innerHTML='<option value="">— выберите сферу —</option>'+
     SFERI.map((s,i)=>`<option value="${i}">${s.name} (${s.count})</option>`).join("");
-  renderStands("",1); renderStands("",2); renderScreens(); renderPlace(); updateStandsMode();
+  renderStands("",1); renderStands("",2); renderScreens("",1); renderScreens("",2); renderPlace(); updateStandsMode(); updateScreensMode();
 }
 
 function stMap(m){return m===2?S.standsM2:S.stands;}
@@ -418,23 +442,36 @@ function updateStandsMode(){
   $("#lblDisc1").textContent=two?"Скидка на стенды · месяц 1, %":"Скидка на стенды, %";
 }
 
-function renderScreens(q=""){
+function scSet(m){return m===2?S.screensM2:S.screens;}
+function scGifts(m){return m===2?S.screensGiftsM2:S.screensGifts;}
+function scSearchFor(m){return $(m===2?"#screensSearch2":"#screensSearch").value;}
+function renderScreens(q="",m=1){
   q=q.trim().toLowerCase();
+  const set=scSet(m), gifts=scGifts(m);
   let html="";
   DATA.screens.forEach((grp,gi)=>{
     const items=grp.items.map((r,ii)=>({r,ii})).filter(o=>!q||o.r.name.toLowerCase().includes(q));
     if(!items.length)return;
     html+=`<div class="grp">${grp.g}</div>`;
-    items.forEach(({r,ii})=>{const key=gi+"|"+ii, sel=S.screens.has(key), p=r.p[S.intensity], gift=S.screensGifts.has(key);
-      const body=sel?`<div class="body"><div class="minirow"><span class="pillchk ${gift?'sel':''}" data-giftscreen="${key}"><span class="b">${gift?'✓':''}</span>🎁 В подарок (0 ₽)</span></div></div>`:"";
+    items.forEach(({r,ii})=>{const key=gi+"|"+ii, sel=set.has(key), p=r.p[S.intensity], gift=gifts.has(key);
+      const body=sel?`<div class="body"><div class="minirow"><span class="pillchk ${gift?'sel':''}" data-giftscreen="${key}" data-m="${m}"><span class="b">${gift?'✓':''}</span>🎁 В подарок (0 ₽)</span></div></div>`:"";
       const pr=gift?'<b style="color:#36c08a">подарок</b>':'<b style="color:#e7eaf0">'+fmt(p)+' ₽</b>';
-      html+=`<div class="it ${sel?'sel':''}" data-screen="${key}"><div class="head">
+      html+=`<div class="it ${sel?'sel':''}" data-screen="${key}" data-m="${m}"><div class="head">
         <span class="chk">${sel?'✓':''}</span><span class="nm">${r.name}</span>
         <span class="meta">${wScreen(r.count)}<br>${r.res?wBuyer(r.res):''}<br>${pr}</span>
         </div>${body}</div>`;});
   });
-  $("#screensList").innerHTML=html;
-  $("#cntScreens").textContent=S.screens.size;
+  $(m===2?"#screensList2":"#screensList").innerHTML=html;
+  $("#cntScreens").textContent=S.screens.size+(S.screens2m?S.screensM2.size:0);
+}
+function updateScreensMode(){
+  const two=S.screens2m;
+  document.querySelectorAll("[data-mms]").forEach(x=>x.classList.toggle("sel",(+x.dataset.mms===2)===two));
+  $("#lblScrM1").style.display=two?"":"none";
+  $("#fieldScrM2").style.display=two?"":"none";
+  $("#fieldDiscS2").style.display=two?"":"none";
+  $("#fieldScreensMonths").style.display=two?"none":"";
+  $("#lblDiscS1").textContent=two?"Скидка на экраны · месяц 1, %":"Скидка на экраны, %";
 }
 
 function renderPlace(){
@@ -500,20 +537,39 @@ function calc(){
     standsRes=0; standsUnits=0; uni.forEach((_,i)=>{standsRes+=DATA.stands[i].res;standsUnits+=DATA.stands[i].count;});
   }
 
-  const sc=[]; let scItems=0,scContacts=0,scRes=0,scUnits=0,giftScreens=0;
-  S.screens.forEach(key=>{const[gi,ii]=key.split("|").map(Number); const r=DATA.screens[gi].items[ii];
-    const gift=S.screensGifts.has(key);
-    const pm=r.p[S.intensity], line=gift?0:pm*S.screensMonths, contacts=r.res*V*S.screensMonths;
-    scItems+=line; scContacts+=contacts; scRes+=r.res; scUnits+=r.count; if(gift)giftScreens++;
-    sc.push({key,name:r.name,count:r.count,res:r.res,gift,line,full:pm*S.screensMonths,contacts,cpc:(!gift&&r.res)?pm/(r.res*V):0});});
+  // расчёт экранов по одной выборке (месяцу)
+  function screensGroup(set,gifts,months){
+    const sc=[]; let items=0,contacts=0,res=0,units=0,giftN=0;
+    set.forEach(key=>{const[gi,ii]=key.split("|").map(Number); const r=DATA.screens[gi].items[ii];
+      const gift=gifts.has(key);
+      const pm=r.p[S.intensity], line=gift?0:pm*months, c=r.res*V*months;
+      items+=line; contacts+=c; res+=r.res; units+=r.count; if(gift)giftN++;
+      sc.push({key,name:r.name,count:r.count,res:r.res,gift,line,full:pm*months,contacts:c,cpc:(!gift&&r.res)?pm/(r.res*V):0});
+    });
+    return {sc,items,contacts,res,units,giftN};
+  }
+  // видео — разовая стоимость (один ролик на всю кампанию)
   let videoCost=0;
-  if(S.screens.size){ if(S.video)videoCost+=CFG.video.make; if(S.videoFix>0)videoCost+=CFG.video.fix*S.videoFix; }
-  const scBase=scItems+videoCost;
+  if(S.screens.size||(S.screens2m&&S.screensM2.size)){ if(S.video)videoCost+=CFG.video.make; if(S.videoFix>0)videoCost+=CFG.video.fix*S.videoFix; }
 
-  const dC=Math.min(50,Math.max(0,S.screensDiscount||0));
-  // скидка на экраны: цена ПОСЛЕ скидки округляется вверх до 50 (стенды уже посчитаны выше)
-  let scDiscSum=scBase*dC/100;
-  if(dC>0) scDiscSum=scBase-rnd50(scBase-scDiscSum);
+  let sc, scContacts, scRes, scUnits, giftScreens, scBase, scDiscSum, dC, scM=null;
+  if(!S.screens2m){
+    const g=screensGroup(S.screens,S.screensGifts,S.screensMonths);
+    sc=g.sc; scContacts=g.contacts; scRes=g.res; scUnits=g.units; giftScreens=g.giftN;
+    scBase=g.items+videoCost;
+    const d=discCalc(scBase,S.screensDiscount); dC=d.d; scDiscSum=d.s;
+  } else {
+    const g1=screensGroup(S.screens,S.screensGifts,1), g2=screensGroup(S.screensM2,S.screensGiftsM2,1);
+    const base1=g1.items+videoCost, base2=g2.items;
+    const d1=discCalc(base1,S.screensDiscount), d2=discCalc(base2,S.screensDiscount2);
+    scM=[{label:"Месяц 1",sc:g1.sc,base:base1,disc:d1.d,discSum:d1.s,video:videoCost,giftN:g1.giftN},
+         {label:"Месяц 2",sc:g2.sc,base:base2,disc:d2.d,discSum:d2.s,video:0,giftN:g2.giftN}];
+    sc=g1.sc.concat(g2.sc);
+    scBase=base1+base2; scDiscSum=d1.s+d2.s; dC=0; giftScreens=g1.giftN+g2.giftN;
+    scContacts=g1.contacts+g2.contacts;
+    const uni=new Set(); S.screens.forEach(k=>uni.add(k)); S.screensM2.forEach(k=>uni.add(k));
+    scRes=0; scUnits=0; uni.forEach(k=>{const[gi,ii]=k.split("|").map(Number);const r=DATA.screens[gi].items[ii];scRes+=r.res;scUnits+=r.count;});
+  }
   const base=standsBase+scBase, discSum=standsDiscSum+scDiscSum, total=base-discSum;
   const contacts=standsContacts+scContacts, totalRes=standsRes+scRes;
   // цена без акций и скидок: все позиции по полной (подарки тоже), позиционирование и видео те же
@@ -521,7 +577,7 @@ function calc(){
   const fullScreens=sc.reduce((a,x)=>a+x.full,0)+videoCost;
   const fullNoPromo=fullStands+fullScreens;
   const benefit=fullNoPromo-total;        // выгода клиента
-  return {st,sc,stM,twoM:S.stands2m,standsBase,scBase,videoCost,base,discSum,total,contacts,totalRes,
+  return {st,sc,stM,scM,twoM:S.stands2m,twoScr:S.screens2m,standsBase,scBase,videoCost,base,discSum,total,contacts,totalRes,
     standsUnits,scUnits,giftStands,giftScreens,posRaw,posSum,posBreak,
     fullNoPromo,benefit,
     standsDisc:dS,screensDisc:dC,standsDiscSum,scDiscSum,cpc:contacts?total/contacts:0};
@@ -560,7 +616,14 @@ function render(){
       (r.posSum?`<div class="sline"><span class="k">⭐ Позиционирование (${bt})</span><span class="v">${fmt(r.posSum)} ₽</span></div>`:"")+
       (r.standsDisc>0?`<div class="sline disc"><span class="k">Скидка на стенды ${r.standsDisc}%</span><span class="v">−${fmt(r.standsDiscSum)} ₽</span></div>`:"")+`</div>`;
   }
-  if(r.sc.length){
+  if(r.scM){   // акция «2 месяца» по экранам
+    r.scM.forEach((M,mi)=>{ if(!M.sc.length)return;
+      h+=`<div class="sblock"><div class="bt">Экраны · ${M.label} · ${CFG.intensity[S.intensity].label}/сут</div>`+
+        M.sc.map(x=>`<div class="sline"><span class="k">${x.name}${giftTag(x)}</span><span class="v">${val(x)}</span></div>`).join("")+
+        (mi===0&&r.videoCost?`<div class="sline"><span class="k">Видео${S.videoFix>0?' + '+S.videoFix+' корр.':''}</span><span class="v">${fmt(r.videoCost)} ₽</span></div>`:"")+
+        (M.disc>0?`<div class="sline disc"><span class="k">Скидка ${M.disc}%</span><span class="v">−${fmt(M.discSum)} ₽</span></div>`:"")+`</div>`;
+    });
+  } else if(r.sc.length){
     h+=`<div class="sblock"><div class="bt">Экраны · ${CFG.intensity[S.intensity].label}/сут</div>`+
       r.sc.map(x=>`<div class="sline"><span class="k">${x.name}${giftTag(x)}</span><span class="v">${val(x)}</span></div>`).join("")+
       (r.videoCost?`<div class="sline"><span class="k">Видео${S.videoFix>0?' + '+S.videoFix+' корр.':''}</span><span class="v">${fmt(r.videoCost)} ₽</span></div>`:"")+
@@ -641,7 +704,16 @@ function tgText(){
     if(S.standsPeriods>1)L.push("Срок: "+S.standsPeriods+" × 30 дней");
     if(r.standsDisc>0)L.push("Скидка на стенды "+r.standsDisc+"%: −"+fmt(r.standsDiscSum)+" ₽");
   }
-  if(r.sc.length){
+  if(r.scM){   // акция «2 месяца» по экранам
+    L.push("\n📺 Экраны в лифтах · акция на 2 месяца");
+    L.push("Интенсивность: "+CFG.intensity[S.intensity].label+"/сутки");
+    r.scM.forEach((M,mi)=>{ if(!M.sc.length)return;
+      L.push("\n🗓️ "+M.label+":");
+      L.push(alignTable(M.sc.map(x=>{const t=priceTriple(x,M.disc);return [x.name, wScreen(x.count), t[0], t[1], t[2]];}),["L","L","R","R","L"]));
+      if(mi===0&&r.videoCost)L.push("+ видеоролик: "+fmt(r.videoCost)+" ₽");
+      if(M.disc>0)L.push("Скидка "+M.disc+"%: −"+fmt(M.discSum)+" ₽");
+    });
+  } else if(r.sc.length){
     L.push("\n📺 Экраны в лифтах");
     L.push("Интенсивность: "+CFG.intensity[S.intensity].label+"/сутки, "+S.screensMonths+" "+plural(S.screensMonths,"месяц","месяца","месяцев"));
     L.push(alignTable(r.sc.map(x=>{const t=priceTriple(x,r.screensDisc);return [x.name, wScreen(x.count), t[0], t[1], t[2]];}),["L","L","R","R","L"]));
@@ -677,7 +749,7 @@ function tgText(){
     const hasSlug=typeof ASLUG!=="undefined";
     L.push("\n🏠 Адреса размещения и охват по домам:");
     [...new Set(r.st.map(x=>x.name))].forEach(nm=>{if(ADDR.stands[nm]&&hasSlug&&ASLUG.stands[nm])L.push("📍 "+nm+": "+abase+"a.html?s="+ASLUG.stands[nm]);});
-    r.sc.forEach(x=>{if(ADDR.screens[x.name]&&hasSlug&&ASLUG.screens[x.name])L.push("📍 "+x.name+": "+abase+"a.html?e="+ASLUG.screens[x.name]);});
+    [...new Set(r.sc.map(x=>x.name))].forEach(nm=>{if(ADDR.screens[nm]&&hasSlug&&ASLUG.screens[nm])L.push("📍 "+nm+": "+abase+"a.html?e="+ASLUG.screens[nm]);});
   }
   // карта под выбор: стенды → карта стендов, экраны → карта экранов, оба → обе
   const mapScreens=CFG.company.mapScreens||CFG.company.map;
@@ -785,19 +857,31 @@ function buildPrint(){
     });
   }
 
-  let screensHtml="";
-  if(r.sc.length){
-    screensHtml+=sec("Экраны в лифтах · элитные дома");
-    screensHtml+=`<div style="color:#444;font-size:13px;margin-bottom:8px">Интенсивность: <b>${CFG.intensity[S.intensity].label} в сутки</b> · срок: <b>${S.screensMonths} ${plural(S.screensMonths,"месяц","месяца","месяцев")}</b> · ролик до 10 сек</div>`;
-    screensHtml+=`<table style="width:100%;border-collapse:collapse">
+  const screensRows=(list,disc,withVideo)=>`<table style="width:100%;border-collapse:collapse">
       <tr><th style="${th}">Дом / БЦ</th><th style="${th};text-align:right">Экранов</th><th style="${th};text-align:right">Покупателей</th>
       <th style="${th};text-align:right">Контактов/мес</th><th style="${th};text-align:right">Стоимость</th></tr>`+
-      r.sc.map(x=>`<tr><td style="${td}">${x.name}${x.gift?' <span style="color:#1a9e6c">🎁</span>':''}</td><td style="${td};text-align:right">${x.count}</td>
+      list.map(x=>`<tr><td style="${td}">${x.name}${x.gift?' <span style="color:#1a9e6c">🎁</span>':''}</td><td style="${td};text-align:right">${x.count}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.res):'—'}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.contacts):'—'}</td>
-        <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,dC)}</td></tr>`).join("")+
-      (r.videoCost?`<tr><td style="${td}" colspan="4">Разработка видеоролика${S.videoFix>0?' + '+S.videoFix+' корректировки':''}</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.videoCost,dC)}</td></tr>`:"")+`</table>`;
-    if(r.giftScreens>0)screensHtml+=`<div style="color:#1a9e6c;font-size:12px;margin-top:4px">🎁 Акция: ${r.giftScreens} ${plural(r.giftScreens,"объект","объекта","объектов")} в подарок.</div>`;
+        <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,disc)}</td></tr>`).join("")+
+      (withVideo&&r.videoCost?`<tr><td style="${td}" colspan="4">Разработка видеоролика${S.videoFix>0?' + '+S.videoFix+' корректировки':''}</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.videoCost,disc)}</td></tr>`:"")+`</table>`;
+  let screensHtml="";
+  if(r.sc.length){
+    if(r.scM){
+      screensHtml+=sec("Экраны в лифтах · акция на 2 месяца");
+      screensHtml+=`<div style="color:#444;font-size:13px;margin-bottom:8px">Интенсивность: <b>${CFG.intensity[S.intensity].label} в сутки</b> · ролик до 10 сек</div>`;
+      r.scM.forEach((M,mi)=>{ if(!M.sc.length)return;
+        screensHtml+=`<div style="font-weight:800;font-size:14px;margin:12px 0 4px">🗓️ ${M.label}</div>`+screensRows(M.sc,M.disc,mi===0);
+        if(M.disc>0)screensHtml+=`<div style="color:${RED};font-size:12px;margin-bottom:4px;text-align:right">Скидка ${M.disc}%: −${fmt(M.discSum)} ₽</div>`;
+        if(M.sc.length>1)screensHtml+=`<div style="font-weight:800;font-size:13px;margin:2px 0 8px;text-align:right;border-top:1px solid #e6e8ec;padding-top:6px">Итого за ${M.label.toLowerCase()}: ${fmt(M.base-M.discSum)} ₽</div>`;
+      });
+      if(r.giftScreens>0)screensHtml+=`<div style="color:#1a9e6c;font-size:12px;margin-top:4px">🎁 Акция: ${r.giftScreens} ${plural(r.giftScreens,"объект","объекта","объектов")} в подарок.</div>`;
+    } else {
+      screensHtml+=sec("Экраны в лифтах · элитные дома");
+      screensHtml+=`<div style="color:#444;font-size:13px;margin-bottom:8px">Интенсивность: <b>${CFG.intensity[S.intensity].label} в сутки</b> · срок: <b>${S.screensMonths} ${plural(S.screensMonths,"месяц","месяца","месяцев")}</b> · ролик до 10 сек</div>`;
+      screensHtml+=screensRows(r.sc,dC,true);
+      if(r.giftScreens>0)screensHtml+=`<div style="color:#1a9e6c;font-size:12px;margin-top:4px">🎁 Акция: ${r.giftScreens} ${plural(r.giftScreens,"объект","объекта","объектов")} в подарок.</div>`;
+    }
     screensHtml+=`<div style="margin-top:12px;text-align:center"><img src="assets/screen.jpg" style="max-height:360px;max-width:60%;border-radius:8px;border:1px solid #ddd">
       <div style="color:#888;font-size:11px;margin-top:4px">Экран 21,5″ Full HD в лифте элитного дома</div></div>`;
   }
@@ -806,7 +890,7 @@ function buildPrint(){
     <table style="width:100%;border-collapse:collapse;font-size:15px">
       <tr><td style="${td}">Стоимость размещения</td><td style="${td};text-align:right">${fmt(r.base)} ₽</td></tr>
       ${r.standsDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на стенды${r.twoM?' (по месяцам)':' '+r.standsDisc+'%'}</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.standsDiscSum)} ₽</td></tr>`:""}
-      ${r.scDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на экраны ${r.screensDisc}%</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.scDiscSum)} ₽</td></tr>`:""}
+      ${r.scDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на экраны${r.twoScr?' (по месяцам)':' '+r.screensDisc+'%'}</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.scDiscSum)} ₽</td></tr>`:""}
       <tr><td style="padding:12px 10px;border-top:2px solid #111;font-size:20px;font-weight:800">ИТОГО</td>
       <td style="padding:12px 10px;border-top:2px solid #111;font-size:20px;font-weight:800;text-align:right;color:${RED}">${fmt(r.total)} ₽</td></tr>
     </table>
@@ -871,7 +955,8 @@ function buildPrint(){
   const hasADDR=typeof ADDR!=="undefined";
   const uniqStandNames=[...new Set(r.st.map(x=>x.name))];   // без дублей (в акции районы могут повторяться по месяцам)
   const standAddr=hasADDR?uniqStandNames.map(nm=>ADDR.stands[nm]?addrStandTable(nm,ADDR.stands[nm]):"").join(""):"";
-  const screenAddr=hasADDR?r.sc.map(x=>ADDR.screens[x.name]?addrScreenTable(x.name,ADDR.screens[x.name]):"").join(""):"";
+  const uniqScreenNames=[...new Set(r.sc.map(x=>x.name))];
+  const screenAddr=hasADDR?uniqScreenNames.map(nm=>ADDR.screens[nm]?addrScreenTable(nm,ADDR.screens[nm]):"").join(""):"";
   if(standAddr||screenAddr){
     addrHtml=sec("Адреса размещения и охват")+
       `<div style="color:#666;font-size:12px;margin:-4px 0 2px">Полный список адресов по выбранным районам и объектам: количество рамок / мониторов, жителей и зрительных контактов в месяц (жители × 60).</div>`+
@@ -1043,15 +1128,24 @@ function bind(){
     S.intensity=+o.dataset.int;$$("[data-int]").forEach(x=>x.classList.toggle("sel",x===o));
     renderScreens($("#screensSearch").value);render();});
   // экраны
-  $("#screensList").addEventListener("click",e=>{
+  const onScreenClick=e=>{
     const gb=e.target.closest("[data-giftscreen]");
-    if(gb){const k=gb.dataset.giftscreen;S.screensGifts.has(k)?S.screensGifts.delete(k):S.screensGifts.add(k);
-      renderScreens($("#screensSearch").value);render();return;}
+    if(gb){const k=gb.dataset.giftscreen,m=+gb.dataset.m; const g=scGifts(m); g.has(k)?g.delete(k):g.add(k);
+      renderScreens(scSearchFor(m),m);render();return;}
     const head=e.target.closest(".head");if(!head)return;
-    const k=head.closest("[data-screen]").dataset.screen;
-    if(S.screens.has(k)){S.screens.delete(k);S.screensGifts.delete(k);}else S.screens.add(k);
-    renderScreens($("#screensSearch").value);render();});
-  $("#screensSearch").addEventListener("input",e=>renderScreens(e.target.value));
+    const it=head.closest("[data-screen]"); const k=it.dataset.screen,m=+it.dataset.m; const set=scSet(m),g=scGifts(m);
+    if(set.has(k)){set.delete(k);g.delete(k);}else set.add(k);
+    renderScreens(scSearchFor(m),m);render();};
+  $("#screensList").addEventListener("click",onScreenClick);
+  $("#screensList2").addEventListener("click",onScreenClick);
+  $("#screensSearch").addEventListener("input",e=>renderScreens(e.target.value,1));
+  $("#screensSearch2").addEventListener("input",e=>renderScreens(e.target.value,2));
+  // переключатель 1/2 месяца по экранам
+  document.querySelectorAll("[data-mms]").forEach(el=>el.addEventListener("click",()=>{
+    const two=+el.dataset.mms===2;
+    if(two && S.screens2m===false && S.screensM2.size===0){ S.screens.forEach(k=>S.screensM2.add(k)); S.screensGifts.forEach(k=>S.screensGiftsM2.add(k)); }
+    S.screens2m=two; updateScreensMode(); renderScreens(scSearchFor(2),2); render();
+  }));
 
   // действия
   document.addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b)return;
@@ -1059,7 +1153,9 @@ function bind(){
     if(a==="clear-stands"){S.stands.clear();S.standsGifts.clear();S.slotsStd.clear();S.slotsSouth.clear();renderStands(searchFor(1),1);}
     if(a==="clear-stands2"){S.standsM2.clear();S.standsGiftsM2.clear();renderStands(searchFor(2),2);}
     if(a==="copy-m2"){S.standsM2.clear();S.standsGiftsM2.clear();S.stands.forEach((f,i)=>S.standsM2.set(i,f));S.standsGifts.forEach(i=>S.standsGiftsM2.add(i));renderStands(searchFor(2),2);}
-    if(a==="clear-screens"){S.screens.clear();S.screensGifts.clear();renderScreens($("#screensSearch").value);}
+    if(a==="clear-screens"){S.screens.clear();S.screensGifts.clear();renderScreens(scSearchFor(1),1);}
+    if(a==="clear-screens2"){S.screensM2.clear();S.screensGiftsM2.clear();renderScreens(scSearchFor(2),2);}
+    if(a==="copy-scrm2"){S.screensM2.clear();S.screensGiftsM2.clear();S.screens.forEach(k=>S.screensM2.add(k));S.screensGifts.forEach(k=>S.screensGiftsM2.add(k));renderScreens(scSearchFor(2),2);}
     if(a==="pics-all"&&S.sfera!==""){SFERI[+S.sfera].imgs.forEach((_,i)=>S.pics.add(i));renderThumbs();}
     if(a==="pics-none"){S.pics.clear();renderThumbs();}
     render();});
@@ -1080,6 +1176,7 @@ function bind(){
   $("#discStands").addEventListener("input",e=>{S.standsDiscount=+e.target.value||0;render();});
   $("#discStands2").addEventListener("input",e=>{S.standsDiscount2=+e.target.value||0;render();});
   $("#discScreens").addEventListener("input",e=>{S.screensDiscount=+e.target.value||0;render();});
+  $("#discScreens2").addEventListener("input",e=>{S.screensDiscount2=+e.target.value||0;render();});
 
   // ждём и ЗАГРУЗКУ, и ДЕКОДИРОВАНИЕ картинок — иначе печать ловит наполовину прорисованное фото
   const imgsReady=imgs=>Promise.all(imgs.map(im=>{
