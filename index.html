@@ -676,7 +676,7 @@ function tgText(){
     const abase=location.protocol==="file:"?"":location.href.replace(/[?#].*$/,"").replace(/[^/]*$/,"");
     const hasSlug=typeof ASLUG!=="undefined";
     L.push("\n🏠 Адреса размещения и охват по домам:");
-    r.st.forEach(x=>{if(ADDR.stands[x.name]&&hasSlug&&ASLUG.stands[x.name])L.push("📍 "+x.name+": "+abase+"a.html?s="+ASLUG.stands[x.name]);});
+    [...new Set(r.st.map(x=>x.name))].forEach(nm=>{if(ADDR.stands[nm]&&hasSlug&&ASLUG.stands[nm])L.push("📍 "+nm+": "+abase+"a.html?s="+ASLUG.stands[nm]);});
     r.sc.forEach(x=>{if(ADDR.screens[x.name]&&hasSlug&&ASLUG.screens[x.name])L.push("📍 "+x.name+": "+abase+"a.html?e="+ASLUG.screens[x.name]);});
   }
   // карта под выбор: стенды → карта стендов, экраны → карта экранов, оба → обе
@@ -751,7 +751,8 @@ function buildPrint(){
       standsHtml+=sec("Стенды в лифтах · акция на 2 месяца");
       r.stM.forEach((M,mi)=>{ if(!M.st.length)return;
         standsHtml+=`<div style="font-weight:800;font-size:14px;margin:12px 0 4px">🗓️ ${M.label}</div>`+standsRows(M.st,M.disc,mi===0);
-        if(M.disc>0)standsHtml+=`<div style="color:${RED};font-size:12px;margin-bottom:6px">Скидка ${M.disc}%: −${fmt(M.discSum)} ₽</div>`;
+        if(M.disc>0)standsHtml+=`<div style="color:${RED};font-size:12px;margin-bottom:4px;text-align:right">Скидка ${M.disc}%: −${fmt(M.discSum)} ₽</div>`;
+        if(M.st.length>1)standsHtml+=`<div style="font-weight:800;font-size:13px;margin:2px 0 8px;text-align:right;border-top:1px solid #e6e8ec;padding-top:6px">Итого за ${M.label.toLowerCase()}: ${fmt(M.base-M.discSum)} ₽</div>`;
       });
       if(r.giftStands>0)standsHtml+=`<div style="color:#1a9e6c;font-size:12px">🎁 Акция: ${r.giftStands} ${plural(r.giftStands,"район","района","районов")} в подарок.</div>`;
     } else {
