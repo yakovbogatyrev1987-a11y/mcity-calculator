@@ -192,13 +192,16 @@
             <div class="stepper"><button type="button" data-step="standsPeriods,-1">−</button>
               <input type="number" id="standsPeriods" value="1" min="1"><button type="button" data-step="standsPeriods,1">+</button></div>
           </div>
-          <div class="field">
+          <div class="field" id="fieldDisc1">
             <label class="lbl" id="lblDisc1">Скидка на стенды, %</label>
             <input type="number" id="discStands" value="0" min="0" max="50">
           </div>
           <div class="field" id="fieldDisc2" style="display:none">
             <label class="lbl">Скидка на стенды · месяц 2, %</label>
             <input type="number" id="discStands2" value="0" min="0" max="50">
+          </div>
+          <div class="field" id="promoDiscNote" style="display:none">
+            <div class="hint" style="line-height:1.5">🎁 Скидка в акции ставится <b>автоматически по району</b>:<br>• популярные — октябрь 10%, ноябрь 15%<br>• непопулярные — октябрь 15%, ноябрь 20%<br>(Железногорск, Сосновоборск, «Весь город» в акции не участвуют — скидка 0%.)</div>
           </div>
         </div>
       </div>
@@ -336,6 +339,10 @@ const wStend=n=>n+" "+plural(n,"стенд","стенда","стендов");
 const wScreen=n=>n+" "+plural(n,"экран","экрана","экранов");
 const wBuyer=n=>fmt(n)+" "+plural(n,"покупатель","покупателя","покупателей");
 const CFG=DATA.config, V=CFG.viewsPerResidentMonth;
+// Акция «2 месяца» по стендам: категории районов → скидка авто (окт/нояб)
+const POP_STANDS=new Set(["Взлётка 1","Взлётка 2","Северный 1","Северный 3","Октябрьский 1","Октябрьский 2","Мясокомбинат","Покровка","Белые Росы","Южный Берег · у входа в лифт","Солнечный 1","Солнечный 2"]);
+const UNPOP_STANDS=new Set(["Зелёная Роща 1","Зелёная Роща 2","Железнодорожный 1","Железнодорожный 2","Центральный","Солнечный 3","Свердловский 1","Свердловский 2","Кировский 1","Кировский 2","Ленинский 1","Ленинский 2","Образцово · у входа в лифт","Северный 2"]);
+function promoDiscStand(name,month){ if(POP_STANDS.has(name))return month===1?10:15; if(UNPOP_STANDS.has(name))return month===1?15:20; return 0; }
 
 /* Матрицы стендов (точная сетка из xlsx). Слот: [col,row,colSpan,rowSpan,формат] */
 const MATRIX={
@@ -437,9 +444,11 @@ function updateStandsMode(){
   document.querySelectorAll("[data-mm]").forEach(x=>x.classList.toggle("sel",(+x.dataset.mm===2)===two));
   $("#lblM1").style.display=two?"":"none";
   $("#fieldM2").style.display=two?"":"none";
-  $("#fieldDisc2").style.display=two?"":"none";
   $("#fieldPeriods").style.display=two?"none":"";
-  $("#lblDisc1").textContent=two?"Скидка на стенды · месяц 1, %":"Скидка на стенды, %";
+  // в акции скидка авто по району → ручные поля прячем, показываем подсказку
+  $("#fieldDisc1").style.display=two?"none":"";
+  $("#fieldDisc2").style.display="none";
+  $("#promoDiscNote").style.display=two?"":"none";
 }
 
 function scSet(m){return m===2?S.screensM2:S.screens;}
@@ -525,14 +534,26 @@ function calc(){
     standsBase=g.items+posSum;
     const d=discCalc(standsBase,S.standsDiscount); dS=d.d; standsDiscSum=d.s;
   } else {
-    const g1=standsGroup(S.stands,S.standsGifts,1), g2=standsGroup(S.standsM2,S.standsGiftsM2,1);
-    const base1=g1.items+posSum, base2=g2.items;
-    const d1=discCalc(base1,S.standsDiscount), d2=discCalc(base2,S.standsDiscount2);
-    stM=[{label:"Месяц 1",st:g1.st,base:base1,disc:d1.d,discSum:d1.s,posSum:posSum,giftN:g1.giftN},
-         {label:"Месяц 2",st:g2.st,base:base2,disc:d2.d,discSum:d2.s,posSum:0,giftN:g2.giftN}];
-    st=g1.st.concat(g2.st);
-    standsBase=base1+base2; standsDiscSum=d1.s+d2.s; dS=0; giftStands=g1.giftN+g2.giftN;
-    standsContacts=g1.contacts+g2.contacts;
+    // акция «2 месяца»: скидка ставится АВТО по категории района (окт/нояб), у каждого района своя
+    const pmonth=(map,gifts,month,withPos)=>{
+      const st=[]; let full=0,total=0,contacts=0,giftN=0;
+      map.forEach((f,i)=>{
+        const r=DATA.stands[i], price=r.p[f]; if(price==null)return;
+        const gift=gifts.has(i), disc=promoDiscStand(r.name,month);
+        const lineFull=gift?0:price, lineDisc=gift?0:(disc>0?rnd50(price*(1-disc/100)):price);
+        full+=lineFull; total+=lineDisc; contacts+=r.res*V; if(gift)giftN++;
+        st.push({i,name:r.name,count:r.count,res:r.res,fmt:CFG.formats[f].label,fi:f,gift,disc,
+          line:lineFull,full:lineFull,lineDisc,contacts:r.res*V,cpc:(!gift&&r.res)?price/(r.res*V):0});
+      });
+      const pos=withPos?posSum:0; full+=pos; total+=pos;
+      return {st,base:full,total,discSum:full-total,contacts,giftN};
+    };
+    const M1=pmonth(S.stands,S.standsGifts,1,true), M2=pmonth(S.standsM2,S.standsGiftsM2,2,false);
+    stM=[{label:"Месяц 1",st:M1.st,base:M1.base,total:M1.total,discSum:M1.discSum,posSum:posSum,giftN:M1.giftN},
+         {label:"Месяц 2",st:M2.st,base:M2.base,total:M2.total,discSum:M2.discSum,posSum:0,giftN:M2.giftN}];
+    st=M1.st.concat(M2.st);
+    standsBase=M1.base+M2.base; standsDiscSum=M1.discSum+M2.discSum; dS=0; giftStands=M1.giftN+M2.giftN;
+    standsContacts=M1.contacts+M2.contacts;
     const uni=new Map(); S.stands.forEach((f,i)=>uni.set(i,1)); S.standsM2.forEach((f,i)=>uni.set(i,1));
     standsRes=0; standsUnits=0; uni.forEach((_,i)=>{standsRes+=DATA.stands[i].res;standsUnits+=DATA.stands[i].count;});
   }
@@ -603,12 +624,14 @@ function render(){
   const giftTag=x=>x.gift?' <span style="color:var(--ok)">🎁</span>':'';
   const val=x=>x.gift?'<span style="color:var(--ok)">подарок</span>':fmt(x.line)+' ₽';
   let h="";
-  if(r.stM){   // акция «2 месяца» — два блока
+  if(r.stM){   // акция «2 месяца» — два блока, скидка авто по району
+    const pval=x=>x.gift?'<span style="color:var(--ok)">подарок</span>'
+      :(x.disc>0?`<span style="color:#8a8f98;text-decoration:line-through;font-size:11px">${fmt(x.line)}</span> ${fmt(x.lineDisc)} ₽`:fmt(x.line)+' ₽');
     r.stM.forEach((M,mi)=>{ if(!M.st.length)return;
       h+=`<div class="sblock"><div class="bt">Стенды · ${M.label}</div>`+
-        M.st.map(x=>`<div class="sline"><span class="k">${x.name} · ${x.fmt}${giftTag(x)}</span><span class="v">${val(x)}</span></div>`).join("")+
+        M.st.map(x=>`<div class="sline"><span class="k">${x.name} · ${x.fmt}${x.disc>0?' <span style="color:var(--accent-2)">−'+x.disc+'%</span>':''}${giftTag(x)}</span><span class="v">${pval(x)}</span></div>`).join("")+
         (mi===0&&r.posSum?`<div class="sline"><span class="k">⭐ Позиционирование (${bt})</span><span class="v">${fmt(r.posSum)} ₽</span></div>`:"")+
-        (M.disc>0?`<div class="sline disc"><span class="k">Скидка ${M.disc}%</span><span class="v">−${fmt(M.discSum)} ₽</span></div>`:"")+`</div>`;
+        `<div class="sline" style="font-weight:700"><span class="k">Итого за ${M.label.toLowerCase()}</span><span class="v">${fmt(M.total)} ₽</span></div></div>`;
     });
   } else if(r.st.length){
     h+=`<div class="sblock"><div class="bt">Стенды</div>`+
@@ -692,10 +715,10 @@ function tgText(){
   if(r.stM){   // акция «2 месяца»
     L.push("\n🖼️ Стенды в лифтах · акция на 2 месяца");
     r.stM.forEach((M,mi)=>{ if(!M.st.length)return;
-      L.push("\n🗓️ "+M.label+":");
-      L.push(alignTable(M.st.map(x=>{const t=priceTriple(x,M.disc);return [x.name, x.fmt, wStend(x.count), t[0], t[1], t[2]];}),["L","L","L","R","R","L"]));
+      L.push("\n🗓️ "+M.label+" (скидка по району):");
+      L.push(alignTable(M.st.map(x=>{const t=priceTriple(x,x.disc);return [x.name, x.fmt, wStend(x.count), t[0], t[1], t[2]];}),["L","L","L","R","R","L"]));
       if(mi===0&&r.posSum)L.push("⭐ Позиционирование ("+posBreakText(r.posBreak)+"): +"+fmt(r.posSum)+" ₽");
-      if(M.disc>0)L.push("Скидка "+M.disc+"%: −"+fmt(M.discSum)+" ₽");
+      L.push("Итого за "+M.label.toLowerCase()+": "+fmt(M.total)+" ₽");
     });
   } else if(r.st.length){
     L.push("\n🖼️ Стенды в лифтах");
@@ -815,16 +838,15 @@ function buildPrint(){
         <td style="${td};font-weight:700">${x.fmt}${x.gift?' <span style="color:#1a9e6c">🎁</span>':''}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.res):'—'}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.contacts):'—'}</td>
-        <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,disc)}</td></tr>`).join("")+
+        <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,x.disc!=null?x.disc:disc)}${x.disc>0?' <span style="color:'+RED+';font-size:10px">−'+x.disc+'%</span>':''}</td></tr>`).join("")+
       (withPos&&r.posSum?`<tr><td style="${td}" colspan="4">⭐ Позиционирование на плакате (${posBreakText(r.posBreak)})</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.posSum,disc)}</td></tr>`:"")+`</table>`;
   let standsHtml="";
   if(r.st.length){
     if(r.stM){
       standsHtml+=sec("Стенды в лифтах · акция на 2 месяца");
       r.stM.forEach((M,mi)=>{ if(!M.st.length)return;
-        standsHtml+=`<div style="font-weight:800;font-size:14px;margin:12px 0 4px">🗓️ ${M.label}</div>`+standsRows(M.st,M.disc,mi===0);
-        if(M.disc>0)standsHtml+=`<div style="color:${RED};font-size:12px;margin-bottom:4px;text-align:right">Скидка ${M.disc}%: −${fmt(M.discSum)} ₽</div>`;
-        if(M.st.length>1)standsHtml+=`<div style="font-weight:800;font-size:13px;margin:2px 0 8px;text-align:right;border-top:1px solid #e6e8ec;padding-top:6px">Итого за ${M.label.toLowerCase()}: ${fmt(M.base-M.discSum)} ₽</div>`;
+        standsHtml+=`<div style="font-weight:800;font-size:14px;margin:12px 0 4px">🗓️ ${M.label} <span style="font-weight:400;font-size:12px;color:#888">— скидка по району</span></div>`+standsRows(M.st,0,mi===0);
+        if(M.st.length>1)standsHtml+=`<div style="font-weight:800;font-size:13px;margin:2px 0 8px;text-align:right;border-top:1px solid #e6e8ec;padding-top:6px">Итого за ${M.label.toLowerCase()}: ${fmt(M.total)} ₽</div>`;
       });
       if(r.giftStands>0)standsHtml+=`<div style="color:#1a9e6c;font-size:12px">🎁 Акция: ${r.giftStands} ${plural(r.giftStands,"район","района","районов")} в подарок.</div>`;
     } else {
@@ -889,7 +911,7 @@ function buildPrint(){
   const totalHtml=`${sec("Стоимость и эффективность")}
     <table style="width:100%;border-collapse:collapse;font-size:15px">
       <tr><td style="${td}">Стоимость размещения</td><td style="${td};text-align:right">${fmt(r.base)} ₽</td></tr>
-      ${r.standsDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на стенды${r.twoM?' (по месяцам)':' '+r.standsDisc+'%'}</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.standsDiscSum)} ₽</td></tr>`:""}
+      ${r.standsDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на стенды${r.twoM?' (акция, по районам)':' '+r.standsDisc+'%'}</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.standsDiscSum)} ₽</td></tr>`:""}
       ${r.scDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на экраны${r.twoScr?' (по месяцам)':' '+r.screensDisc+'%'}</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.scDiscSum)} ₽</td></tr>`:""}
       <tr><td style="padding:12px 10px;border-top:2px solid #111;font-size:20px;font-weight:800">ИТОГО</td>
       <td style="padding:12px 10px;border-top:2px solid #111;font-size:20px;font-weight:800;text-align:right;color:${RED}">${fmt(r.total)} ₽</td></tr>
