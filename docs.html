@@ -57,6 +57,11 @@
   .paper .center{text-align:center}
   .paper table{border-collapse:collapse;width:100%;margin:6px 0}
   .paper td,.paper th{border:1px solid #000;padding:5px 7px;font-size:13px;text-align:left;vertical-align:top}
+  .paper table.kvtable td{text-align:center;vertical-align:middle}
+  .paper table.kvtable td.lbl{width:40%}
+  .paper table.sigtable{border:none}
+  .paper table.sigtable td{border:none;width:50%;vertical-align:top;padding:2px 12px 2px 0;font-size:14px}
+  .paper table.sigtable p{margin:1px 0;text-align:left}
   .busy{opacity:.5;pointer-events:none}
 </style>
 </head>
@@ -75,10 +80,15 @@
   <div class="form">
 
     <div class="card">
-      <h2><span class="n">1</span> Договор</h2>
+      <h2><span class="n">1</span> Что формируем</h2>
+      <div class="seg" id="modeSeg">
+        <button data-m="dogovor" class="on">Договор + приложения</button>
+        <button data-m="prilozhenie">Только приложение</button>
+      </div>
+      <p class="hint" id="modeHint">Полный договор со всеми условиями и техническими заданиями.</p>
       <div class="row">
-        <div><label>Номер договора</label><input id="docNum" value="89"></div>
-        <div><label>Дата договора</label><input id="docDate" type="date"></div>
+        <div><label id="docNumLbl">Номер договора</label><input id="docNum" value="89"></div>
+        <div><label id="docDateLbl">Дата договора</label><input id="docDate" type="date"></div>
       </div>
       <label>Город</label><input id="docCity" value="г. Красноярск">
     </div>
@@ -303,12 +313,13 @@ function rublesWords(num){
 function fmtSum(n){return (Number(n)||0).toLocaleString('ru-RU')+' ('+rublesWords(n)+') руб.';}
 
 /* ================= состояние ================= */
-const S={exec:'ooo', cli:'ip', tz:[]};
+const S={mode:'dogovor', exec:'ooo', cli:'ip', tz:[]};
 function newTz(preset){
-  const t={service:'Услуги по размещению Рекламы в лифтах', object:'', qty:'', sizeLabel:'Размер макета (мм):', size:'', macet:'', place:'1 календарный месяц после установки', install:'', sum:'', pay:''};
+  const t={appNum:'', service:'Услуги по размещению Рекламы в лифтах', object:'', qty:'', sizeLabel:'Размер макета (мм):', size:'', macetDate:'', place:'1 календарный месяц после установки', installFrom:'', installTo:'', sum:'', payDate:''};
   if(preset==='screen'){t.service='Услуги по размещению Рекламы в лифтах на ЖК экранах';t.sizeLabel='Размер макета (рх):';t.size='1920 х 1080';}
   return t;
 }
+function dmy(iso){ if(!iso)return ''; const p=iso.split('-'); return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):''; }
 
 /* ================= вспомогательное ================= */
 const $=id=>document.getElementById(id);
@@ -354,62 +365,74 @@ function composeCliName2(){
 }
 
 /* ================= блоки документа ================= */
+// две колонки подписей: [левая строки[], правая строки[]]; строка={t,b}
+function sigCells(sigUnderscore){
+  const exec=[{t:'Исполнитель:',b:true},{t:$('execName').value.trim(),b:true}];
+  $('execReq').value.split('\n').forEach(l=>{if(l.trim())exec.push({t:l.trim(),b:false});});
+  exec.push({t:'',b:false});
+  exec.push({t:sigUnderscore+' '+$('execSign').value.trim(),b:false});
+  exec.push({t:'М.П.',b:false});
+  const cli=[{t:'Заказчик:',b:true},{t:$('cliName2').value.trim(),b:true}];
+  $('cliReq').value.split('\n').forEach(l=>{if(l.trim())cli.push({t:l.trim(),b:false});});
+  cli.push({t:'',b:false});
+  cli.push({t:sigUnderscore+' '+$('cliSign').value.trim(),b:false});
+  cli.push({t:'М.П.',b:false});
+  return [exec,cli];
+}
+function tzStrings(t){
+  const macet=t.macetDate?('До '+dmy(t.macetDate)+' г.'):'';
+  const install=(t.installFrom&&t.installTo)?('С '+dmy(t.installFrom)+' г. по '+dmy(t.installTo)+' г.'):(t.installFrom?('С '+dmy(t.installFrom)+' г.'):'');
+  const pay=t.payDate?('До '+dmy(t.payDate)+' г.'):'';
+  return {macet,install,pay};
+}
+function pushTz(B,t,appNum,num,date,city){
+  B.push(['apphdr','Приложение № '+appNum+' к договору']);
+  B.push(['apphdr','№ '+(num||'____')+' от '+(date||'____________')]);
+  B.push(['center','Техническое задание на размещение рекламно-информационного материала']);
+  B.push(['citydate',city,date]);
+  B.push(['p',execPreamble()]);
+  B.push(['p',cliPreamble().replace('заключили настоящий Договор о нижеследующем:','утвердили следующее техническое задание на размещение рекламно-информационного материала:')]);
+  const s=tzStrings(t);
+  B.push(['kvtable',[
+    ['Наименование услуг',t.service],
+    ['Район / Маршрут:',t.object],
+    ['Количество (шт.):',t.qty],
+    [t.sizeLabel,t.size],
+    ['Сроки предоставления готовых макетов:',s.macet],
+    ['Срок размещения Рекламы:',t.place],
+    ['Период установки Рекламы:',s.install],
+    ['Стоимость работ (руб.), в т.ч. НДС 5%:',t.sum!==''?fmtSum(t.sum):''],
+    ['Срок оплаты услуг:',s.pay]
+  ]]);
+  B.push(['center','Подписи сторон:']);
+  B.push(['sigtable'].concat(sigCells('____________________')));
+}
 function buildBlocks(){
   const num=$('docNum').value.trim(), date=dateRu($('docDate').value), city=$('docCity').value.trim();
   const B=[];
-  B.push(['title','ДОГОВОР № '+num]);
-  B.push(['sub','на размещение рекламно-информационных материалов']);
-  B.push(['citydate',city,date]);
-  B.push(['p',execPreamble()]);
-  B.push(['p',cliPreamble()]);
-  BODY.forEach(x=>B.push(x));
-  // подписи сторон
-  B.push(['h','ЮРИДИЧЕСКИЕ АДРЕСА И ПОДПИСИ СТОРОН:']);
-  B.push(['req','Исполнитель:',true]);
-  B.push(['req',$('execName').value.trim(),true]);
-  $('execReq').value.split('\n').forEach(l=>{if(l.trim())B.push(['req',l.trim(),false]);});
-  B.push(['sig','_________________ '+$('execSign').value.trim()]);
-  B.push(['req','М.П.',false]);
-  B.push(['req','',false]);
-  B.push(['req','Заказчик:',true]);
-  B.push(['req',$('cliName2').value.trim(),true]);
-  $('cliReq').value.split('\n').forEach(l=>{if(l.trim())B.push(['req',l.trim(),false]);});
-  B.push(['sig','_________________ '+$('cliSign').value.trim()]);
-  B.push(['req','М.П.',false]);
 
-  // ==== ТЗ (приложения начиная с №4; 1-3 — стандартные формы) ====
-  S.tz.forEach((t,i)=>{
-    const appNum=4+i;
-    B.push(['pagebreak']);
-    B.push(['apphdr','Приложение '+appNum+' к договору']);
-    B.push(['apphdr','№ '+num+' от '+(date||'____________')]);
-    B.push(['center','Техническое задание на размещение рекламно-информационного материала']);
+  if(S.mode==='dogovor'){
+    B.push(['title','ДОГОВОР № '+num]);
+    B.push(['sub','на размещение рекламно-информационных материалов']);
     B.push(['citydate',city,date]);
     B.push(['p',execPreamble()]);
-    B.push(['p',cliPreamble().replace('заключили настоящий Договор о нижеследующем:','утвердили следующее техническое задание на размещение рекламно-информационного материала:')]);
-    const kv=[
-      ['Наименование услуг',t.service],
-      ['Район / Маршрут:',t.object],
-      ['Количество (шт.):',t.qty],
-      [t.sizeLabel,t.size],
-      ['Сроки предоставления готовых макетов:',t.macet],
-      ['Срок размещения Рекламы:',t.place],
-      ['Период установки Рекламы:',t.install],
-      ['Стоимость работ (руб.), в т.ч. НДС 5%:',t.sum!==''?fmtSum(t.sum):''],
-      ['Срок оплаты услуг:',t.pay]
-    ];
-    kv.forEach(p=>{B.push(['kvl',p[0]]);B.push(['kvv',p[1]]);});
-    B.push(['center','Подписи сторон:']);
-    B.push(['req','Исполнитель:',true]);
-    B.push(['req',$('execName').value.trim(),true]);
-    B.push(['sig','____________________ '+$('execSign').value.trim()]);
-    B.push(['req','М.П.',false]);
-    B.push(['req','',false]);
-    B.push(['req','Заказчик:',true]);
-    B.push(['req',$('cliName2').value.trim(),true]);
-    B.push(['sig','_____________ '+$('cliSign').value.trim()]);
-    B.push(['req','М.П.',false]);
-  });
+    B.push(['p',cliPreamble()]);
+    BODY.forEach(x=>B.push(x));
+    // подписи сторон — в две колонки, на одной странице
+    B.push(['h','ЮРИДИЧЕСКИЕ АДРЕСА И ПОДПИСИ СТОРОН:']);
+    B.push(['sigtable'].concat(sigCells('_________________')));
+    // ТЗ (приложения с №4; 1-3 — стандартные формы)
+    S.tz.forEach((t,i)=>{
+      B.push(['pagebreak']);
+      pushTz(B,t,(t.appNum.trim()||String(4+i)),num,date,city);
+    });
+  } else {
+    // только приложение(я) — каждое на своей странице
+    S.tz.forEach((t,i)=>{
+      if(i>0)B.push(['pagebreak']);
+      pushTz(B,t,(t.appNum.trim()||String(i+1)),num,date,city);
+    });
+  }
   return B;
 }
 
@@ -425,10 +448,15 @@ function renderPreview(){
     else if(t==='p')h+='<p>'+esc(b[1])+'</p>';
     else if(t==='center')h+='<p class="center"><b>'+esc(b[1])+'</b></p>';
     else if(t==='apphdr')h+='<p class="apphdr">'+esc(b[1])+'</p>';
-    else if(t==='req')h+='<p class="req">'+(b[2]?'<b>'+esc(b[1])+'</b>':esc(b[1]))+(b[1]===''?'&nbsp;':'')+'</p>';
-    else if(t==='sig')h+='<p class="sig">'+esc(b[1])+'</p>';
-    else if(t==='kvl')h+='<p class="kvl">'+esc(b[1])+'</p>';
-    else if(t==='kvv')h+='<p class="kvv">'+esc(b[1]||'—')+'</p>';
+    else if(t==='kvtable'){
+      h+='<table class="kvtable">';
+      b[1].forEach(r=>{h+='<tr><td class="lbl">'+esc(r[0])+'</td><td>'+esc(r[1]||'')+'</td></tr>';});
+      h+='</table>';
+    }
+    else if(t==='sigtable'){
+      const cell=lines=>lines.map(l=>'<p>'+(l.b?'<b>'+esc(l.t)+'</b>':esc(l.t))+(l.t===''?'&nbsp;':'')+'</p>').join('');
+      h+='<table class="sigtable"><tr><td>'+cell(b[1])+'</td><td>'+cell(b[2])+'</td></tr></table>';
+    }
     else if(t==='pagebreak')h+='<div class="pb">— разрыв страницы —</div>';
   });
   $('paper').innerHTML=h;
@@ -446,14 +474,31 @@ function buildDocx(){
     if(t==='title'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{after:60},children:[run(b[1],{bold:true,size:30})]}));}
     else if(t==='sub'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{after:160},children:[run(b[1],{size:26})]}));}
     else if(t==='citydate'){children.push(new d.Paragraph({tabStops:[{type:d.TabStopType.RIGHT,position:9350}],spacing:{before:120,after:120},children:[run(b[1],{size:24}),run('\t'+b[2],{size:24})]}));}
-    else if(t==='h'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{before:200,after:120},children:[run(b[1],{bold:true,size:24})]}));}
+    else if(t==='h'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{before:200,after:120},keepNext:true,children:[run(b[1],{bold:true,size:24})]}));}
     else if(t==='p'){children.push(new d.Paragraph({alignment:d.AlignmentType.JUSTIFIED,spacing:{after:80},children:[run(b[1],{size:24})]}));}
-    else if(t==='center'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{before:140,after:100},children:[run(b[1],{bold:true,size:24})]}));}
+    else if(t==='center'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{before:140,after:100},keepNext:true,children:[run(b[1],{bold:true,size:24})]}));}
     else if(t==='apphdr'){children.push(new d.Paragraph({alignment:d.AlignmentType.RIGHT,children:[run(b[1],{size:24})]}));}
-    else if(t==='req'){children.push(new d.Paragraph({spacing:{after:20},children:[run(b[1],{size:24,bold:!!b[2]})]}));}
-    else if(t==='sig'){children.push(new d.Paragraph({spacing:{before:120,after:20},children:[run(b[1],{size:24})]}));}
-    else if(t==='kvl'){children.push(new d.Paragraph({spacing:{before:100,after:10},children:[run(b[1],{bold:true,size:24})]}));}
-    else if(t==='kvv'){children.push(new d.Paragraph({spacing:{after:40},children:[run(b[1]||'—',{size:24})]}));}
+    else if(t==='kvtable'){
+      const bd={style:d.BorderStyle.SINGLE,size:4,color:'000000'};
+      const cellPara=(txt,al)=>new d.Paragraph({alignment:al,spacing:{before:20,after:20},children:[run(txt||'',{size:22})]});
+      const rows=b[1].map(r=>new d.TableRow({cantSplit:true,children:[
+        new d.TableCell({width:{size:3740,type:d.WidthType.DXA},margins:{top:20,bottom:20,left:80,right:80},children:[cellPara(r[0],d.AlignmentType.CENTER)]}),
+        new d.TableCell({width:{size:5610,type:d.WidthType.DXA},margins:{top:20,bottom:20,left:80,right:80},children:[cellPara(r[1],d.AlignmentType.CENTER)]})
+      ]}));
+      children.push(new d.Table({width:{size:9350,type:d.WidthType.DXA},columnWidths:[3740,5610],
+        borders:{top:bd,bottom:bd,left:bd,right:bd,insideHorizontal:bd,insideVertical:bd},rows:rows}));
+    }
+    else if(t==='sigtable'){
+      const cellPars=lines=>lines.map(l=>new d.Paragraph({spacing:{after:20},children:[run(l.t,{size:24,bold:!!l.b})]}));
+      const none={style:d.BorderStyle.NONE,size:0,color:'FFFFFF'};
+      const nb={top:none,bottom:none,left:none,right:none};
+      children.push(new d.Table({width:{size:9350,type:d.WidthType.DXA},columnWidths:[4675,4675],
+        borders:{top:none,bottom:none,left:none,right:none,insideHorizontal:none,insideVertical:none},
+        rows:[new d.TableRow({cantSplit:true,children:[
+          new d.TableCell({width:{size:4675,type:d.WidthType.DXA},borders:nb,margins:{right:160},children:cellPars(b[1])}),
+          new d.TableCell({width:{size:4675,type:d.WidthType.DXA},borders:nb,margins:{left:80},children:cellPars(b[2])})
+        ]})]}));
+    }
     else if(t==='pagebreak'){children.push(new d.Paragraph({children:[new d.PageBreak()]}));}
   });
   const doc=new d.Document({
@@ -479,19 +524,24 @@ function renderTz(){
   const wrap=$('tzList');wrap.innerHTML='';
   S.tz.forEach((t,i)=>{
     const div=document.createElement('div');div.className='tz';
+    const autoNum=S.mode==='dogovor'?(4+i):(i+1);
     div.innerHTML=
-      '<div class="th"><b>Приложение № '+(4+i)+' · ТЗ</b><button class="del" data-del="'+i+'">Удалить</button></div>'+
+      '<div class="th"><b>Тех. задание '+(i+1)+'</b><button class="del" data-del="'+i+'">Удалить</button></div>'+
+      '<div class="row"><div><label>№ приложения</label><input data-f="appNum" data-i="'+i+'" value="'+esc(t.appNum)+'" placeholder="'+autoNum+'"></div>'+
+      '<div><label>&nbsp;</label><div class="hint" style="margin:8px 0 0">к договору № '+esc($('docNum').value.trim()||'—')+'</div></div></div>'+
       '<label>Наименование услуг</label><input data-f="service" data-i="'+i+'" value="'+esc(t.service)+'">'+
       '<div class="row"><div><label>Район / Маршрут</label><input data-f="object" data-i="'+i+'" value="'+esc(t.object)+'"></div>'+
       '<div><label>Количество</label><input data-f="qty" data-i="'+i+'" value="'+esc(t.qty)+'" placeholder="108 шт."></div></div>'+
       '<div class="row"><div><label>Подпись размера</label><input data-f="sizeLabel" data-i="'+i+'" value="'+esc(t.sizeLabel)+'"></div>'+
       '<div><label>Размер</label><input data-f="size" data-i="'+i+'" value="'+esc(t.size)+'" placeholder="401 х 280"></div></div>'+
-      '<label>Сроки предоставления готовых макетов</label><input data-f="macet" data-i="'+i+'" value="'+esc(t.macet)+'" placeholder="До 08.09.2026 г.">'+
+      '<label>Сроки предоставления готовых макетов (до)</label><input type="date" data-f="macetDate" data-i="'+i+'" value="'+esc(t.macetDate)+'">'+
       '<label>Срок размещения Рекламы</label><input data-f="place" data-i="'+i+'" value="'+esc(t.place)+'">'+
-      '<label>Период установки Рекламы</label><input data-f="install" data-i="'+i+'" value="'+esc(t.install)+'" placeholder="С 18.09.2026 г. по 21.09.2026 г.">'+
+      '<label>Период установки Рекламы</label>'+
+      '<div class="row"><div><span class="hint">с</span><input type="date" data-f="installFrom" data-i="'+i+'" value="'+esc(t.installFrom)+'"></div>'+
+      '<div><span class="hint">по</span><input type="date" data-f="installTo" data-i="'+i+'" value="'+esc(t.installTo)+'"></div></div>'+
       '<div class="row"><div><label>Стоимость, руб. (число)</label><input data-f="sum" data-i="'+i+'" value="'+esc(t.sum)+'" inputmode="numeric" placeholder="44495"></div>'+
-      '<div><label>Срок оплаты услуг</label><input data-f="pay" data-i="'+i+'" value="'+esc(t.pay)+'" placeholder="До 10.09.2026 г."></div></div>'+
-      '<p class="hint">'+(t.sum!==''?'Прописью: '+fmtSum(t.sum):'')+'</p>';
+      '<div><label>Срок оплаты услуг (до)</label><input type="date" data-f="payDate" data-i="'+i+'" value="'+esc(t.payDate)+'"></div></div>'+
+      '<p class="hint sumhint">'+(t.sum!==''?'Прописью: '+fmtSum(t.sum):'')+'</p>';
     wrap.appendChild(div);
   });
 }
@@ -515,10 +565,21 @@ function applyCliType(){
   refreshCliDerived();
 }
 
+function applyMode(){
+  const d=S.mode==='dogovor';
+  $('modeHint').textContent=d?'Полный договор со всеми условиями и техническими заданиями.':'Только приложение(я) к уже заключённому договору — каждое с отдельным номером, на своей странице.';
+  $('docNumLbl').textContent=d?'Номер договора':'Номер договора (к которому приложение)';
+  $('docDateLbl').textContent=d?'Дата договора':'Дата договора (к которому приложение)';
+}
+
 /* ================= события ================= */
 function bind(){
   // дата по умолчанию — сегодня
   $('docDate').value=new Date().toISOString().slice(0,10);
+
+  $('modeSeg').addEventListener('click',e=>{const b=e.target.closest('button[data-m]');if(!b)return;
+    [...$('modeSeg').children].forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    S.mode=b.dataset.m;applyMode();renderTz();renderPreview();});
 
   $('execSeg').addEventListener('click',e=>{const b=e.target.closest('button[data-e]');if(!b)return;
     [...$('execSeg').children].forEach(x=>x.classList.remove('on'));b.classList.add('on');
@@ -532,8 +593,10 @@ function bind(){
   ['cliName','cliBasis','cliOrgFull','cliOrgShort','cliRole','cliHead'].forEach(id=>{
     $(id).addEventListener('input',()=>{refreshCliDerived();renderPreview();});
   });
+  // номер договора влияет и на подсказку в ТЗ
+  $('docNum').addEventListener('input',()=>{renderTz();renderPreview();});
   // остальные поля — просто перерисовка предпросмотра
-  ['docNum','docDate','docCity','execPre','execName','execReq','execSign','cliPre','cliName2','cliReq','cliSign'].forEach(id=>{
+  ['docDate','docCity','execPre','execName','execReq','execSign','cliPre','cliName2','cliReq','cliSign'].forEach(id=>{
     $(id).addEventListener('input',renderPreview);
   });
 
@@ -544,7 +607,7 @@ function bind(){
   $('tzList').addEventListener('input',e=>{const el=e.target.closest('[data-f]');if(!el)return;
     const i=+el.dataset.i,f=el.dataset.f;S.tz[i][f]=el.value;
     // обновить подсказку «прописью» без полной перерисовки формы
-    if(f==='sum'){const hint=el.closest('.tz').querySelector('.hint');hint.textContent=el.value!==''?'Прописью: '+fmtSum(el.value):'';}
+    if(f==='sum'){const hint=el.closest('.tz').querySelector('.sumhint');if(hint)hint.textContent=el.value!==''?'Прописью: '+fmtSum(el.value):'';}
     renderPreview();});
 
   $('btnWord').addEventListener('click',downloadWord);
@@ -553,6 +616,7 @@ function bind(){
 
 /* ================= старт ================= */
 applyExec();
+applyMode();
 S.tz.push(newTz(''));           // первое ТЗ — стенды
 refreshCliDerived();
 bind();
