@@ -31,6 +31,8 @@
   .picklist label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:400;color:#222;margin:0;padding:3px 2px;cursor:pointer}
   .picklist input{width:auto}
   .picklist .qc{margin-left:auto;color:var(--mut);font-size:12px}
+  .picklist .grouphd{font-size:11px;font-weight:800;color:var(--red);text-transform:uppercase;letter-spacing:.03em;margin:6px 2px 2px;padding-top:4px;border-top:1px solid var(--line)}
+  .picklist .grouphd:first-child{border-top:none;padding-top:0}
   .fmtgroup{display:flex;gap:6px;margin:4px 0}
   .fmtgroup button{flex:1;font:inherit;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer}
   .fmtgroup button.on{background:#1b1f27;color:#fff;border-color:#1b1f27;font-weight:700}
@@ -357,13 +359,18 @@ const INSTALL_GROUPS={
   screen2w:{label:'Экраны · 2 недели',d1:28,d2:1,nextMonthEnd:true,svc:'screen'}
 };
 const SERVICE_TXT={stend:'Услуги по размещению Рекламы в лифтах', screen:'Услуги по размещению Рекламы в лифтах на ЖК экранах'};
+const PLACE_OPTS=['1 календарный месяц после установки','2 недели после установки'];
+// плоский список экранов из data.js (по группам)
+const SCREENS=[];
+if(typeof DATA!=='undefined' && DATA.screens) DATA.screens.forEach(gr=>gr.items.forEach(it=>SCREENS.push({name:it.name,count:it.count,group:gr.g})));
+function pluralScreens(n){const d=n%10,h=n%100;if(h>=11&&h<=14)return 'экранов';if(d===1)return 'экран';if(d>=2&&d<=4)return 'экрана';return 'экранов';}
 
 const S={mode:'dogovor', exec:'ooo', cli:'ip', tz:[]};
 function newTz(preset){
   const svc=preset==='screen'?'screen':'stend';
-  const t={appNum:'', svc:svc, service:SERVICE_TXT[svc], districts:[], object:'', qty:'',
+  const t={appNum:'', svc:svc, service:SERVICE_TXT[svc], districts:[], screensSel:[], object:'', qty:'',
     formatsReg:[], formatsSouth:[], sizeLabel:svc==='screen'?'Размер макета (рх):':'Размер макета (мм):', size:svc==='screen'?'1920 х 1080':'',
-    macetDate:'', place:'1 календарный месяц после установки', installMonth:'', installGroups:[], sum:'', payDate:''};
+    macetDate:'', place:PLACE_OPTS[0], installMonth:'', installGroups:[], sum:'', payDate:''};
   return t;
 }
 function dmy(iso){ if(!iso)return ''; const p=iso.split('-'); return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):''; }
@@ -394,6 +401,13 @@ function recomputeDistricts(t){
     const order=['zhel','krsk','south'];
     t.installGroups=order.filter(g=>arr.some(r=>districtGroup(r.name)===g));
   }
+}
+// пересчёт «Район/Маршрут» и «Количество» из выбранных ЭКРАНОВ
+function recomputeScreens(t){
+  const arr=t.screensSel.slice().sort((a,b)=>a-b).map(si=>SCREENS[si]);
+  if(arr.length===0){t.object='';t.qty='';}
+  else if(arr.length===1){t.object=arr[0].name;t.qty=arr[0].count+' '+pluralScreens(arr[0].count);}
+  else{t.object=arr.map(r=>r.name).join('\n');t.qty=arr.map(r=>r.name+' – '+r.count+' '+pluralScreens(r.count)).join('\n');}
 }
 // пересчёт «Размер макета» из выбранных форматов ОБЕИХ матриц
 function recomputeFormats(t){
@@ -688,6 +702,15 @@ function installGroupsHtml(i,t){
   return keys.map(k=>{const g=INSTALL_GROUPS[k],on=t.installGroups.includes(k);
     return '<label><input type="checkbox" data-ig="'+k+'" data-i="'+i+'"'+(on?' checked':'')+'>'+esc(g.label)+'<span class="qc">с '+g.d1+' по '+g.d2+'</span></label>';}).join('');
 }
+function screenListHtml(i,t){
+  let h='',lastG=null;
+  SCREENS.forEach((s,si)=>{
+    if(s.group!==lastG){h+='<div class="grouphd">'+esc(s.group)+'</div>';lastG=s.group;}
+    const on=t.screensSel.includes(si);
+    h+='<label><input type="checkbox" data-si="'+si+'" data-i="'+i+'"'+(on?' checked':'')+'>'+esc(s.name)+'<span class="qc">'+s.count+'</span></label>';
+  });
+  return h;
+}
 function renderTz(){
   const wrap=$('tzList');wrap.innerHTML='';
   S.tz.forEach((t,i)=>{
@@ -702,9 +725,11 @@ function renderTz(){
       '<label>Наименование услуг</label>'+
       '<div class="fmtgroup"><button data-svc="stend" data-i="'+i+'" class="'+(isStend?'on':'')+'">Стенды</button>'+
       '<button data-svc="screen" data-i="'+i+'" class="'+(!isStend?'on':'')+'">Экраны</button></div>';
-    // выбор районов (стенды)
+    // выбор районов (стенды) / объектов-экранов
     if(isStend)
       h+='<details class="pickbox" data-dbox="'+i+'"'+(t.districts.length?' open':'')+'><summary>📍 Выбрать районы / маршруты <span class="cnt">'+t.districts.length+'</span></summary><div class="picklist">'+distListHtml(i,t)+'</div></details>';
+    else
+      h+='<details class="pickbox" data-sbox="'+i+'"'+(t.screensSel.length?' open':'')+'><summary>📺 Выбрать объекты (экраны) <span class="cnt">'+t.screensSel.length+'</span></summary><div class="picklist">'+screenListHtml(i,t)+'</div></details>';
     h+='<label>Район / Маршрут (в договоре)</label><textarea data-f="object" data-i="'+i+'" rows="'+Math.max(1,(t.object.split("\n").length))+'">'+esc(t.object)+'</textarea>'+
       '<label>Количество</label><textarea data-f="qty" data-i="'+i+'" rows="'+Math.max(1,(t.qty.split("\n").length))+'" placeholder="108 шт.">'+esc(t.qty)+'</textarea>';
     // размер макета
@@ -713,7 +738,11 @@ function renderTz(){
     h+='<div class="row"><div><label>Подпись строки размера</label><input data-f="sizeLabel" data-i="'+i+'" value="'+esc(t.sizeLabel)+'"></div></div>'+
       '<textarea data-f="size" data-i="'+i+'" rows="'+Math.max(1,(t.size.split("\n").length))+'" placeholder="179 х 112">'+esc(t.size)+'</textarea>'+
       '<label>Сроки предоставления готовых макетов (до)</label><input type="date" data-f="macetDate" data-i="'+i+'" value="'+esc(t.macetDate)+'">'+
-      '<label>Срок размещения Рекламы</label><input data-f="place" data-i="'+i+'" value="'+esc(t.place)+'">'+
+      '<label>Срок размещения Рекламы</label>'+
+      (isStend
+        ? '<input data-f="place" data-i="'+i+'" value="'+esc(t.place)+'">'
+        : '<div class="fmtgroup"><button data-place="0" data-i="'+i+'" class="'+(t.place===PLACE_OPTS[1]?'':'on')+'">1 месяц</button>'+
+          '<button data-place="1" data-i="'+i+'" class="'+(t.place===PLACE_OPTS[1]?'on':'')+'">2 недели</button></div>')+
       // период установки — месяц + галочки групп
       '<label>Период установки Рекламы</label>'+
       '<div class="row"><div><span class="hint">месяц установки</span><input type="month" data-f="installMonth" data-i="'+i+'" value="'+esc(t.installMonth)+'"></div></div>'+
@@ -790,10 +819,14 @@ function bind(){
     const sv=e.target.closest('button[data-svc]');
     if(sv){const i=+sv.dataset.i,t=S.tz[i];if(t.svc===sv.dataset.svc)return;
       t.svc=sv.dataset.svc;
-      // сброс под новый тип
-      if(t.svc==='screen'){t.service=SERVICE_TXT.screen;t.sizeLabel='Размер макета (рх):';if(!t.size)t.size='1920 х 1080';t.districts=[];t.formatsReg=[];t.formatsSouth=[];t.installGroups=[];}
-      else{t.service=SERVICE_TXT.stend;t.sizeLabel='Размер макета (мм):';t.installGroups=[];}
+      t.object='';t.qty='';t.installGroups=[];t.place=PLACE_OPTS[0];
+      if(t.svc==='screen'){t.service=SERVICE_TXT.screen;t.sizeLabel='Размер макета (рх):';t.size='1920 х 1080';t.districts=[];t.formatsReg=[];t.formatsSouth=[];}
+      else{t.service=SERVICE_TXT.stend;t.sizeLabel='Размер макета (мм):';t.size='';t.screensSel=[];}
       renderTz();renderPreview();return;}
+    const pl=e.target.closest('button[data-place]');
+    if(pl){const i=+pl.dataset.i,t=S.tz[i];t.place=PLACE_OPTS[+pl.dataset.place];
+      pl.closest('.tz').querySelectorAll('[data-place]').forEach(b=>b.classList.toggle('on',b===pl));
+      renderPreview();return;}
   });
 
   // галочки: районы / форматы / группы установки
@@ -808,6 +841,16 @@ function bind(){
       card.querySelector('textarea[data-f="qty"]').value=t.qty;
       card.querySelector('[data-dbox="'+i+'"] .cnt').textContent=t.districts.length;
       const ig=card.querySelector('[data-igwrap="'+i+'"]');if(ig)ig.innerHTML=installGroupsHtml(i,t);
+      renderPreview();return;}
+    // объект-экран
+    const sc=e.target.closest('input[data-si]');
+    if(sc){const si=+sc.dataset.si,i=+sc.dataset.i,t=S.tz[i];
+      if(sc.checked){if(!t.screensSel.includes(si))t.screensSel.push(si);}else{t.screensSel=t.screensSel.filter(x=>x!==si);}
+      recomputeScreens(t);
+      const card=sc.closest('.tz');
+      card.querySelector('textarea[data-f="object"]').value=t.object;
+      card.querySelector('textarea[data-f="qty"]').value=t.qty;
+      card.querySelector('[data-sbox="'+i+'"] .cnt').textContent=t.screensSel.length;
       renderPreview();return;}
     // формат (любая из матриц)
     const fc=e.target.closest('input[data-fi]');
