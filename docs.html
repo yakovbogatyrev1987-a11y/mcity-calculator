@@ -353,11 +353,11 @@ const FMT_SOUTH=[
 ];
 // группы установки: фиксированные дни (с d1 по d2), порядок по d1
 const INSTALL_GROUPS={
-  zhel:{label:'Железногорск / Сосновоборск',d1:4,d2:5,svc:'stend'},
-  krsk:{label:'Красноярск · стенды',d1:5,d2:13,svc:'stend'},
-  south:{label:'Южный берег / Образцово',d1:18,d2:20,svc:'stend'},
-  screenM:{label:'Экраны · месяц',d1:14,d2:17,svc:'screen'},
-  screen2w:{label:'Экраны · 2 недели',d1:28,d2:1,nextMonthEnd:true,svc:'screen'}
+  zhel:{label:'Железногорск / Сосновоборск',doc:'Железногорск / Сосновоборск',d1:4,d2:5,svc:'stend'},
+  krsk:{label:'Красноярск · стенды',doc:'Красноярск',d1:5,d2:13,svc:'stend'},
+  south:{label:'Южный берег / Образцово',doc:'Южный берег / Образцово',d1:18,d2:20,svc:'stend'},
+  screenM:{label:'Экраны · месяц',doc:'Экраны',d1:14,d2:17,svc:'screen'},
+  screen2w:{label:'Экраны · 2 недели',doc:'Экраны',d1:28,d2:1,nextMonthEnd:true,svc:'screen'}
 };
 const SERVICE_TXT={stend:'Услуги по размещению Рекламы в лифтах', screen:'Услуги по размещению Рекламы в лифтах на ЖК экранах'};
 const PLACE_OPTS=['1 календарный месяц после установки','2 недели после установки'];
@@ -385,7 +385,7 @@ function computeInstall(t){
     const mon=t.installMonths[k]; if(!mon)return;
     const parts=mon.split('-'); const y=+parts[0], m=+parts[1]; const g=INSTALL_GROUPS[k];
     let ey=y,em=m; if(g.nextMonthEnd){em=m===12?1:m+1; ey=m===12?y+1:y;}
-    rows.push({sort:y*10000+m*100+g.d1, line:'С '+dmy2(y,m,g.d1)+' г. по '+dmy2(ey,em,g.d2)+' г.'});
+    rows.push({sort:y*10000+m*100+g.d1, line:g.doc+': С '+dmy2(y,m,g.d1)+' г. по '+dmy2(ey,em,g.d2)+' г.'});
   });
   rows.sort((a,b)=>a.sort-b.sort);
   return rows.map(r=>r.line).join('\n');
