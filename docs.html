@@ -36,6 +36,7 @@
   .fmtgroup{display:flex;gap:6px;margin:4px 0}
   .fmtgroup button{flex:1;font:inherit;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer}
   .fmtgroup button.on{background:#1b1f27;color:#fff;border-color:#1b1f27;font-weight:700}
+  .igmonth{margin:2px 0 8px 26px;width:calc(100% - 26px);font-size:13px;padding:6px 8px}
   .card{background:#fff;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.06);padding:14px 16px;margin-bottom:14px}
   .card h2{margin:0 0 10px;font-size:15px;display:flex;align-items:center;gap:8px}
   .card h2 .n{width:22px;height:22px;background:var(--red);color:#fff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto}
@@ -370,20 +371,24 @@ function newTz(preset){
   const svc=preset==='screen'?'screen':'stend';
   const t={appNum:'', svc:svc, service:SERVICE_TXT[svc], districts:[], screensSel:[], object:'', qty:'',
     formatsReg:[], formatsSouth:[], sizeLabel:svc==='screen'?'Размер макета (рх):':'Размер макета (мм):', size:svc==='screen'?'1920 х 1080':'',
-    macetDate:'', place:PLACE_OPTS[0], installMonth:'', installGroups:[], sum:'', payDate:''};
+    macetDate:'', place:PLACE_OPTS[0], installGroups:[], installMonths:{}, sum:'', payDate:''};
   return t;
 }
 function dmy(iso){ if(!iso)return ''; const p=iso.split('-'); return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):''; }
 function pad2(n){return String(n).padStart(2,'0');}
-// строка «Период установки»: по выбранным группам, в хронологическом порядке
+// строка «Период установки»: у каждой группы СВОЙ месяц, сортировка по реальной дате начала
 function computeInstall(t){
-  if(!t.installMonth || !t.installGroups.length) return '';
-  const parts=t.installMonth.split('-'); const y=+parts[0], m=+parts[1];
   const dmy2=(yy,mm,dd)=>pad2(dd)+'.'+pad2(mm)+'.'+yy;
-  const keys=Object.keys(INSTALL_GROUPS).filter(k=>t.installGroups.includes(k)).sort((a,b)=>INSTALL_GROUPS[a].d1-INSTALL_GROUPS[b].d1);
-  return keys.map(k=>{const g=INSTALL_GROUPS[k];const from=dmy2(y,m,g.d1);let to;
-    if(g.nextMonthEnd){const nm=m===12?1:m+1, ny=m===12?y+1:y; to=dmy2(ny,nm,g.d2);} else to=dmy2(y,m,g.d2);
-    return 'С '+from+' г. по '+to+' г.';}).join('\n');
+  const rows=[];
+  Object.keys(INSTALL_GROUPS).forEach(k=>{
+    if(!t.installGroups.includes(k))return;
+    const mon=t.installMonths[k]; if(!mon)return;
+    const parts=mon.split('-'); const y=+parts[0], m=+parts[1]; const g=INSTALL_GROUPS[k];
+    let ey=y,em=m; if(g.nextMonthEnd){em=m===12?1:m+1; ey=m===12?y+1:y;}
+    rows.push({sort:y*10000+m*100+g.d1, line:'С '+dmy2(y,m,g.d1)+' г. по '+dmy2(ey,em,g.d2)+' г.'});
+  });
+  rows.sort((a,b)=>a.sort-b.sort);
+  return rows.map(r=>r.line).join('\n');
 }
 function districtGroup(name){
   if(/Железногорск|Сосновоборск/.test(name))return 'zhel';
@@ -699,8 +704,9 @@ function fmtBoxHtml(i,t,group){
 }
 function installGroupsHtml(i,t){
   const keys=Object.keys(INSTALL_GROUPS).filter(k=>INSTALL_GROUPS[k].svc===t.svc);
-  return keys.map(k=>{const g=INSTALL_GROUPS[k],on=t.installGroups.includes(k);
-    return '<label><input type="checkbox" data-ig="'+k+'" data-i="'+i+'"'+(on?' checked':'')+'>'+esc(g.label)+'<span class="qc">с '+g.d1+' по '+g.d2+'</span></label>';}).join('');
+  return keys.map(k=>{const g=INSTALL_GROUPS[k],on=t.installGroups.includes(k),mon=t.installMonths[k]||'';
+    return '<label><input type="checkbox" data-ig="'+k+'" data-i="'+i+'"'+(on?' checked':'')+'>'+esc(g.label)+'<span class="qc">с '+g.d1+' по '+g.d2+'</span></label>'
+      +(on?'<input type="month" class="igmonth" data-igm="'+k+'" data-i="'+i+'" value="'+esc(mon)+'"'+(mon?'':' style="border-color:var(--red)"')+'>':'');}).join('');
 }
 function screenListHtml(i,t){
   let h='',lastG=null;
@@ -745,7 +751,7 @@ function renderTz(){
           '<button data-place="1" data-i="'+i+'" class="'+(t.place===PLACE_OPTS[1]?'on':'')+'">2 недели</button></div>')+
       // период установки — месяц + галочки групп
       '<label>Период установки Рекламы</label>'+
-      '<div class="row"><div><span class="hint">месяц установки</span><input type="month" data-f="installMonth" data-i="'+i+'" value="'+esc(t.installMonth)+'"></div></div>'+
+      '<p class="hint" style="margin:0 0 4px">Отметьте, что берёт клиент, и укажите месяц установки для каждой позиции отдельно.</p>'+
       '<div class="picklist" data-igwrap="'+i+'" style="max-height:none;border:1px solid var(--line);border-radius:8px;margin:6px 0">'+installGroupsHtml(i,t)+'</div>'+
       '<div class="row"><div><label>Стоимость, руб. (число)</label><input data-f="sum" data-i="'+i+'" value="'+esc(t.sum)+'" inputmode="numeric" placeholder="44495"></div>'+
       '<div><label>Срок оплаты услуг (до)</label><input type="date" data-f="payDate" data-i="'+i+'" value="'+esc(t.payDate)+'"></div></div>'+
@@ -862,15 +868,20 @@ function bind(){
       card.querySelector('textarea[data-f="size"]').value=t.size;
       fc.closest('details').querySelector('.cnt').textContent=arr.length;
       renderPreview();return;}
-    // группа установки
+    // группа установки — показать/скрыть её месяц
     const ic=e.target.closest('input[data-ig]');
     if(ic){const k=ic.dataset.ig,i=+ic.dataset.i,t=S.tz[i];
       if(ic.checked){if(!t.installGroups.includes(k))t.installGroups.push(k);}else{t.installGroups=t.installGroups.filter(x=>x!==k);}
+      const wrap=ic.closest('[data-igwrap]');if(wrap)wrap.innerHTML=installGroupsHtml(i,t);
       renderPreview();return;}
   });
 
-  // ввод текстовых/датовых полей и месяца установки
-  $('tzList').addEventListener('input',e=>{const el=e.target.closest('[data-f]');if(!el||el.type==='checkbox')return;
+  // ввод: месяц группы установки / текстовые и датовые поля
+  $('tzList').addEventListener('input',e=>{
+    const im=e.target.closest('input[data-igm]');
+    if(im){const k=im.dataset.igm,i=+im.dataset.i,t=S.tz[i];t.installMonths[k]=im.value;
+      im.style.borderColor=im.value?'':'var(--red)';renderPreview();return;}
+    const el=e.target.closest('[data-f]');if(!el||el.type==='checkbox')return;
     const i=+el.dataset.i,f=el.dataset.f,t=S.tz[i];t[f]=el.value;
     if(f==='sum'){const hint=el.closest('.tz').querySelector('.sumhint');if(hint)hint.textContent=el.value!==''?'Прописью: '+fmtSum(el.value):'';}
     renderPreview();});
