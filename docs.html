@@ -392,7 +392,7 @@ function computeInstall(t){
     const mon=t.installMonths[k]; if(!mon)return;
     const parts=mon.split('-'); const y=+parts[0], m=+parts[1]; const g=INSTALL_GROUPS[k];
     let ey=y,em=m; if(g.nextMonthEnd){em=m===12?1:m+1; ey=m===12?y+1:y;}
-    rows.push({sort:y*10000+m*100+g.d1, line:g.doc+': С '+dmy2(y,m,g.d1)+' г. по '+dmy2(ey,em,g.d2)+' г.'});
+    rows.push({sort:y*10000+m*100+g.d1, line:'С '+dmy2(y,m,g.d1)+' г. по '+dmy2(ey,em,g.d2)+' г.'});
   });
   rows.sort((a,b)=>a.sort-b.sort);
   return rows.map(r=>r.line).join('\n');
