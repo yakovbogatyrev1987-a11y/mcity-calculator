@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Документы — M-CITY</title>
+<script src="data.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
 <style>
   :root{--red:#e21f2b;--ink:#111;--mut:#666;--line:#e6e8ec;--bg:#f4f5f7}
@@ -18,9 +19,21 @@
   .top .nav a{font-size:13px;color:#333;text-decoration:none;border:1px solid var(--line);padding:7px 12px;border-radius:9px;background:#fff}
   .top .nav a.active{background:var(--red);color:#fff;border-color:var(--red)}
   .layout{display:flex;gap:16px;align-items:flex-start;padding:16px;max-width:1500px;margin:0 auto}
-  .form{flex:0 0 440px;max-width:440px}
+  .form{flex:0 0 460px;max-width:460px;position:sticky;top:12px;align-self:flex-start;max-height:calc(100vh - 24px);overflow-y:auto;padding-right:4px}
   .prev{flex:1 1 auto;min-width:0}
-  @media(max-width:1000px){.layout{flex-direction:column}.form{flex:none;max-width:100%;width:100%}}
+  @media(max-width:1000px){.layout{flex-direction:column}.form{flex:none;max-width:100%;width:100%;position:static;max-height:none;overflow:visible}}
+  /* списки выбора районов и форматов */
+  details.pickbox{border:1px solid var(--line);border-radius:8px;margin:6px 0;background:#fff}
+  details.pickbox>summary{cursor:pointer;padding:8px 10px;font-size:13px;font-weight:600;color:#333;list-style:none;display:flex;justify-content:space-between;align-items:center}
+  details.pickbox>summary::-webkit-details-marker{display:none}
+  details.pickbox>summary .cnt{background:var(--red);color:#fff;border-radius:20px;font-size:11px;padding:1px 8px;font-weight:700}
+  .picklist{max-height:190px;overflow-y:auto;padding:4px 8px 8px}
+  .picklist label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:400;color:#222;margin:0;padding:3px 2px;cursor:pointer}
+  .picklist input{width:auto}
+  .picklist .qc{margin-left:auto;color:var(--mut);font-size:12px}
+  .fmtgroup{display:flex;gap:6px;margin:4px 0}
+  .fmtgroup button{flex:1;font:inherit;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer}
+  .fmtgroup button.on{background:#1b1f27;color:#fff;border-color:#1b1f27;font-weight:700}
   .card{background:#fff;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.06);padding:14px 16px;margin-bottom:14px}
   .card h2{margin:0 0 10px;font-size:15px;display:flex;align-items:center;gap:8px}
   .card h2 .n{width:22px;height:22px;background:var(--red);color:#fff;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto}
@@ -313,13 +326,75 @@ function rublesWords(num){
 function fmtSum(n){return (Number(n)||0).toLocaleString('ru-RU')+' ('+rublesWords(n)+') руб.';}
 
 /* ================= состояние ================= */
+// матрицы форматов (по прайсу)
+const FMT_REG=[
+  ['Ф3 горизонтальный','360 х 226'],
+  ['Ф4 вертикальный','179 х 226'],
+  ['Ф5 горизонтальный','179 х 112'],
+  ['Ф6 вертикальный','87 х 112'],
+  ['Ф5+Ф5 горизонтальный вытянутый','360 х 112'],
+  ['Ф6+Ф6 вертикальный','87 х 226'],
+  ['Ф5+Ф5+Ф6 горизонтальный вытянутый','447 х 112'],
+  ['Ф5+Ф6 горизонтальный','268 х 112'],
+  ['Ф6+Ф6+Ф6+Ф6 вертикальный','87 х 454'],
+  ['Ф6+Ф6+Ф6 вертикальный','87 х 340'],
+  ['Ф4+Ф4+Ф4 горизонтальный','541 х 226']
+];
+const FMT_SOUTH=[
+  ['Ф1 горизонтальный','1004 х 442'],
+  ['Ф2 горизонтальный','803 х 280'],
+  ['Ф3 горизонтальный вытянутый','669 х 160'],
+  ['Ф3 горизонтальный','401 х 280'],
+  ['Ф4 горизонтальный','334 х 160'],
+  ['Ф4 вертикальный','200 х 280']
+];
+// типы установки: смещение второй даты
+const INSTALL={
+  krsk:{label:'Красноярск · стенды (с 5 по 13)',off:8},
+  south:{label:'Южный берег / Образцово · стенды (с 18 по 20)',off:2},
+  zhel:{label:'Железногорск / Сосновоборск (с 4 по 5)',off:1},
+  screenM:{label:'Экраны · месяц (с 14 по 17)',off:3},
+  screen2w:{label:'Экраны · 2 недели (с 28 по 01)',off:'nm1'},
+  manual:{label:'Вручную',off:null}
+};
+
 const S={mode:'dogovor', exec:'ooo', cli:'ip', tz:[]};
 function newTz(preset){
-  const t={appNum:'', service:'Услуги по размещению Рекламы в лифтах', object:'', qty:'', sizeLabel:'Размер макета (мм):', size:'', macetDate:'', place:'1 календарный месяц после установки', installFrom:'', installTo:'', sum:'', payDate:''};
-  if(preset==='screen'){t.service='Услуги по размещению Рекламы в лифтах на ЖК экранах';t.sizeLabel='Размер макета (рх):';t.size='1920 х 1080';}
+  const t={appNum:'', service:'Услуги по размещению Рекламы в лифтах', districts:[], object:'', qty:'',
+    fmtGroup:'reg', formats:[], sizeLabel:'Размер макета (мм):', size:'',
+    macetDate:'', place:'1 календарный месяц после установки', installType:'krsk', installFrom:'', installTo:'', sum:'', payDate:''};
+  if(preset==='screen'){t.service='Услуги по размещению Рекламы в лифтах на ЖК экранах';t.sizeLabel='Размер макета (рх):';t.size='1920 х 1080';t.installType='screenM';}
   return t;
 }
 function dmy(iso){ if(!iso)return ''; const p=iso.split('-'); return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):''; }
+function isoOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function computeInstallTo(fromIso,type){
+  if(!fromIso)return '';
+  const cfg=INSTALL[type]; if(!cfg||cfg.off===null)return null; // null = не трогать
+  const d=new Date(fromIso+'T00:00:00'); if(isNaN(d))return '';
+  if(cfg.off==='nm1')return isoOf(new Date(d.getFullYear(),d.getMonth()+1,1));
+  d.setDate(d.getDate()+cfg.off); return isoOf(d);
+}
+// пересчёт «Район/Маршрут» и «Количество» из выбранных районов
+function recomputeDistricts(t){
+  const arr=t.districts.slice().sort((a,b)=>a-b).map(di=>DATA.stands[di]);
+  if(arr.length===0){t.object='';t.qty='';}
+  else if(arr.length===1){t.object=arr[0].name;t.qty=arr[0].count+' шт.';}
+  else{t.object=arr.map(r=>r.name).join('\n');t.qty=arr.map(r=>r.name+' – '+r.count+' шт.').join('\n');}
+  // умный тип установки для стендов
+  const names=arr.map(r=>r.name);
+  if(['krsk','south','zhel'].includes(t.installType) && names.length){
+    if(names.every(n=>/Железногорск|Сосновоборск/.test(n)))t.installType='zhel';
+    else if(names.some(n=>/Южный Берег|Образцово/.test(n)))t.installType='south';
+    else t.installType='krsk';
+  }
+}
+// пересчёт «Размер макета» из выбранных форматов
+function recomputeFormats(t){
+  const list=t.fmtGroup==='south'?FMT_SOUTH:FMT_REG;
+  const chosen=t.formats.slice().sort((a,b)=>a-b).map(fi=>list[fi]).filter(Boolean);
+  t.size=chosen.map(c=>c[0]+' — '+c[1]).join('\n');
+}
 
 /* ================= вспомогательное ================= */
 const $=id=>document.getElementById(id);
@@ -500,7 +575,7 @@ function renderPreview(){
     else if(t==='apphdr')h+='<p class="apphdr">'+esc(b[1])+'</p>';
     else if(t==='kvtable'){
       h+='<table class="kvtable">';
-      b[1].forEach(r=>{h+='<tr><td class="lbl">'+esc(r[0])+'</td><td>'+(esc(r[1]||'')||'&nbsp;')+'</td></tr>';});
+      b[1].forEach(r=>{const v=esc(r[1]||'').replace(/\n/g,'<br>')||'&nbsp;';h+='<tr><td class="lbl">'+esc(r[0])+'</td><td>'+v+'</td></tr>';});
       h+='</table>';
     }
     else if(t==='btable'){
@@ -536,10 +611,10 @@ function buildDocx(){
     else if(t==='apphdr'){children.push(new d.Paragraph({alignment:d.AlignmentType.RIGHT,children:[run(b[1],{size:24})]}));}
     else if(t==='kvtable'){
       const bd={style:d.BorderStyle.SINGLE,size:4,color:'000000'};
-      const cellPara=(txt,al)=>new d.Paragraph({alignment:al,spacing:{before:20,after:20},children:[run(txt||'',{size:22})]});
+      const cellParas=(txt,al)=>String(txt||' ').split('\n').map(line=>new d.Paragraph({alignment:al,spacing:{before:20,after:20},children:[run(line,{size:22})]}));
       const rows=b[1].map(r=>new d.TableRow({cantSplit:true,children:[
-        new d.TableCell({width:{size:3740,type:d.WidthType.DXA},margins:{top:20,bottom:20,left:80,right:80},children:[cellPara(r[0],d.AlignmentType.CENTER)]}),
-        new d.TableCell({width:{size:5610,type:d.WidthType.DXA},margins:{top:20,bottom:20,left:80,right:80},children:[cellPara(r[1],d.AlignmentType.CENTER)]})
+        new d.TableCell({width:{size:3740,type:d.WidthType.DXA},margins:{top:20,bottom:20,left:80,right:80},children:cellParas(r[0],d.AlignmentType.CENTER)}),
+        new d.TableCell({width:{size:5610,type:d.WidthType.DXA},margins:{top:20,bottom:20,left:80,right:80},children:cellParas(r[1],d.AlignmentType.CENTER)})
       ]}));
       children.push(new d.Table({width:{size:9350,type:d.WidthType.DXA},columnWidths:[3740,5610],
         borders:{top:bd,bottom:bd,left:bd,right:bd,insideHorizontal:bd,insideVertical:bd},rows:rows}));
@@ -586,6 +661,26 @@ function downloadWord(){
 }
 
 /* ================= рендер формы ТЗ ================= */
+function distListHtml(i,t){
+  let h='';
+  DATA.stands.forEach((r,di)=>{
+    const on=t.districts.includes(di);
+    h+='<label><input type="checkbox" data-di="'+di+'" data-i="'+i+'"'+(on?' checked':'')+'>'+esc(r.name)+'<span class="qc">'+r.count+' шт.</span></label>';
+  });
+  return h;
+}
+function fmtListHtml(i,t){
+  const list=t.fmtGroup==='south'?FMT_SOUTH:FMT_REG;
+  let h='';
+  list.forEach((f,fi)=>{
+    const on=t.formats.includes(fi);
+    h+='<label><input type="checkbox" data-fi="'+fi+'" data-i="'+i+'"'+(on?' checked':'')+'>'+esc(f[0])+'<span class="qc">'+esc(f[1])+'</span></label>';
+  });
+  return h;
+}
+function installOptsHtml(t){
+  return Object.keys(INSTALL).map(k=>'<option value="'+k+'"'+(t.installType===k?' selected':'')+'>'+esc(INSTALL[k].label)+'</option>').join('');
+}
 function renderTz(){
   const wrap=$('tzList');wrap.innerHTML='';
   S.tz.forEach((t,i)=>{
@@ -596,15 +691,23 @@ function renderTz(){
       '<div class="row"><div><label>№ приложения</label><input data-f="appNum" data-i="'+i+'" value="'+esc(t.appNum)+'" placeholder="'+autoNum+'"></div>'+
       '<div><label>&nbsp;</label><div class="hint" style="margin:8px 0 0">к договору № '+esc($('docNum').value.trim()||'—')+'</div></div></div>'+
       '<label>Наименование услуг</label><input data-f="service" data-i="'+i+'" value="'+esc(t.service)+'">'+
-      '<div class="row"><div><label>Район / Маршрут</label><input data-f="object" data-i="'+i+'" value="'+esc(t.object)+'"></div>'+
-      '<div><label>Количество</label><input data-f="qty" data-i="'+i+'" value="'+esc(t.qty)+'" placeholder="108 шт."></div></div>'+
-      '<div class="row"><div><label>Подпись размера</label><input data-f="sizeLabel" data-i="'+i+'" value="'+esc(t.sizeLabel)+'"></div>'+
-      '<div><label>Размер</label><input data-f="size" data-i="'+i+'" value="'+esc(t.size)+'" placeholder="401 х 280"></div></div>'+
+      // выбор районов
+      '<details class="pickbox" data-dbox="'+i+'"'+(t.districts.length?' open':'')+'><summary>📍 Выбрать районы / маршруты <span class="cnt">'+t.districts.length+'</span></summary><div class="picklist">'+distListHtml(i,t)+'</div></details>'+
+      '<label>Район / Маршрут (в договоре)</label><textarea data-f="object" data-i="'+i+'" rows="'+Math.max(1,t.districts.length||1)+'">'+esc(t.object)+'</textarea>'+
+      '<label>Количество</label><textarea data-f="qty" data-i="'+i+'" rows="'+Math.max(1,t.districts.length||1)+'" placeholder="108 шт.">'+esc(t.qty)+'</textarea>'+
+      // выбор форматов
+      '<label>Размер макета</label>'+
+      '<div class="fmtgroup"><button data-fg="reg" data-i="'+i+'" class="'+(t.fmtGroup!=='south'?'on':'')+'">Обычные лифты</button>'+
+      '<button data-fg="south" data-i="'+i+'" class="'+(t.fmtGroup==='south'?'on':'')+'">Южный берег / Образцово</button></div>'+
+      '<details class="pickbox" data-fbox="'+i+'"'+(t.formats.length?' open':'')+'><summary>📐 Выбрать форматы <span class="cnt">'+t.formats.length+'</span></summary><div class="picklist" data-flist="'+i+'">'+fmtListHtml(i,t)+'</div></details>'+
+      '<div class="row"><div><label>Подпись строки размера</label><input data-f="sizeLabel" data-i="'+i+'" value="'+esc(t.sizeLabel)+'"></div></div>'+
+      '<textarea data-f="size" data-i="'+i+'" rows="'+Math.max(1,t.formats.length||1)+'" placeholder="179 х 112">'+esc(t.size)+'</textarea>'+
       '<label>Сроки предоставления готовых макетов (до)</label><input type="date" data-f="macetDate" data-i="'+i+'" value="'+esc(t.macetDate)+'">'+
       '<label>Срок размещения Рекламы</label><input data-f="place" data-i="'+i+'" value="'+esc(t.place)+'">'+
       '<label>Период установки Рекламы</label>'+
-      '<div class="row"><div><span class="hint">с</span><input type="date" data-f="installFrom" data-i="'+i+'" value="'+esc(t.installFrom)+'"></div>'+
-      '<div><span class="hint">по</span><input type="date" data-f="installTo" data-i="'+i+'" value="'+esc(t.installTo)+'"></div></div>'+
+      '<select data-f="installType" data-i="'+i+'">'+installOptsHtml(t)+'</select>'+
+      '<div class="row"><div><span class="hint">с (выберите)</span><input type="date" data-f="installFrom" data-i="'+i+'" value="'+esc(t.installFrom)+'"></div>'+
+      '<div><span class="hint">по (авто)</span><input type="date" data-f="installTo" data-i="'+i+'" value="'+esc(t.installTo)+'"></div></div>'+
       '<div class="row"><div><label>Стоимость, руб. (число)</label><input data-f="sum" data-i="'+i+'" value="'+esc(t.sum)+'" inputmode="numeric" placeholder="44495"></div>'+
       '<div><label>Срок оплаты услуг (до)</label><input type="date" data-f="payDate" data-i="'+i+'" value="'+esc(t.payDate)+'"></div></div>'+
       '<p class="hint sumhint">'+(t.sum!==''?'Прописью: '+fmtSum(t.sum):'')+'</p>';
@@ -668,11 +771,51 @@ function bind(){
 
   // ТЗ
   $('addTz').addEventListener('click',()=>{S.tz.push(newTz(S.tz.length===0?'':'screen'));renderTz();renderPreview();});
-  $('tzList').addEventListener('click',e=>{const d=e.target.closest('button[data-del]');if(!d)return;
-    S.tz.splice(+d.dataset.del,1);renderTz();renderPreview();});
-  $('tzList').addEventListener('input',e=>{const el=e.target.closest('[data-f]');if(!el)return;
-    const i=+el.dataset.i,f=el.dataset.f;S.tz[i][f]=el.value;
-    // обновить подсказку «прописью» без полной перерисовки формы
+
+  // клики: удалить ТЗ / переключить группу форматов
+  $('tzList').addEventListener('click',e=>{
+    const del=e.target.closest('button[data-del]');
+    if(del){S.tz.splice(+del.dataset.del,1);renderTz();renderPreview();return;}
+    const fg=e.target.closest('button[data-fg]');
+    if(fg){const i=+fg.dataset.i,t=S.tz[i];t.fmtGroup=fg.dataset.fg;t.formats=[];recomputeFormats(t);
+      const card=fg.closest('.tz');
+      card.querySelectorAll('[data-fg]').forEach(b=>b.classList.toggle('on',b.dataset.fg===t.fmtGroup));
+      card.querySelector('[data-flist="'+i+'"]').innerHTML=fmtListHtml(i,t);
+      card.querySelector('[data-fbox="'+i+'"] .cnt').textContent='0';
+      card.querySelector('textarea[data-f="size"]').value=t.size;
+      renderPreview();}
+  });
+
+  // галочки: районы / форматы
+  $('tzList').addEventListener('change',e=>{
+    const dc=e.target.closest('input[data-di]');
+    if(dc){const di=+dc.dataset.di,i=+dc.dataset.i,t=S.tz[i];
+      if(dc.checked){if(!t.districts.includes(di))t.districts.push(di);}else{t.districts=t.districts.filter(x=>x!==di);}
+      recomputeDistricts(t);
+      const card=dc.closest('.tz');
+      card.querySelector('textarea[data-f="object"]').value=t.object;
+      card.querySelector('textarea[data-f="qty"]').value=t.qty;
+      card.querySelector('[data-dbox="'+i+'"] .cnt').textContent=t.districts.length;
+      const sel=card.querySelector('select[data-f="installType"]');if(sel)sel.value=t.installType;
+      if(t.installType!=='manual'&&t.installFrom){const to=computeInstallTo(t.installFrom,t.installType);if(to!==null){t.installTo=to;card.querySelector('input[data-f="installTo"]').value=to;}}
+      renderPreview();return;}
+    const fc=e.target.closest('input[data-fi]');
+    if(fc){const fi=+fc.dataset.fi,i=+fc.dataset.i,t=S.tz[i];
+      if(fc.checked){if(!t.formats.includes(fi))t.formats.push(fi);}else{t.formats=t.formats.filter(x=>x!==fi);}
+      recomputeFormats(t);
+      const card=fc.closest('.tz');
+      card.querySelector('textarea[data-f="size"]').value=t.size;
+      card.querySelector('[data-fbox="'+i+'"] .cnt').textContent=t.formats.length;
+      renderPreview();return;}
+  });
+
+  // ввод текстовых/датовых полей и селекта установки
+  $('tzList').addEventListener('input',e=>{const el=e.target.closest('[data-f]');if(!el||el.type==='checkbox')return;
+    const i=+el.dataset.i,f=el.dataset.f,t=S.tz[i];t[f]=el.value;
+    if(f==='installType'||f==='installFrom'){
+      if(t.installType!=='manual'&&t.installFrom){const to=computeInstallTo(t.installFrom,t.installType);
+        if(to!==null){t.installTo=to;const toEl=el.closest('.tz').querySelector('input[data-f="installTo"]');if(toEl)toEl.value=to;}}
+    }
     if(f==='sum'){const hint=el.closest('.tz').querySelector('.sumhint');if(hint)hint.textContent=el.value!==''?'Прописью: '+fmtSum(el.value):'';}
     renderPreview();});
 
