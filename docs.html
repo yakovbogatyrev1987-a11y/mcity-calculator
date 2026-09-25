@@ -174,7 +174,6 @@
     </div>
 
     <div class="genbar">
-      <button class="bPrint" id="btnPrint">Печать / PDF</button>
       <button class="bWord" id="btnWord">Скачать Word</button>
     </div>
   </div>
@@ -486,6 +485,14 @@ function sigCells(sigUnderscore){
   cli.push({t:'М.П.',b:false});
   return [exec,cli];
 }
+// короткие подписи (для ТЗ) — без реквизитов, только наименование + подпись
+function sigCellsShort(sigUnderscore){
+  const exec=[{t:'Исполнитель:',b:true},{t:$('execName').value.trim(),b:true},{t:'',b:false},
+    {t:sigUnderscore+' '+$('execSign').value.trim(),b:false},{t:'М.П.',b:false}];
+  const cli=[{t:'Заказчик:',b:true},{t:$('cliName2').value.trim(),b:true},{t:'',b:false},
+    {t:sigUnderscore+' '+$('cliSign').value.trim(),b:false},{t:'М.П.',b:false}];
+  return [exec,cli];
+}
 function tzStrings(t){
   const macet=t.macetDate?('До '+dmy(t.macetDate)+' г.'):'';
   const install=computeInstall(t);
@@ -506,8 +513,7 @@ function pushAppendix123(B,num,date,city){
     [{t:' '},{t:' '}],
     [{t:' '},{t:' '}]
   ]]);
-  // Приложение 2
-  B.push(['pagebreak']);
+  // Приложение 2 (на том же листе, что и 1)
   B.push(['apphdr','Приложение 2 к договору']);
   B.push(['apphdr','№ '+dl+' от '+dd]);
   B.push(['center','Перечень разрешительной документации, предоставляемой Заказчиком']);
@@ -516,8 +522,7 @@ function pushAppendix123(B,num,date,city){
     [{t:'Обязательные сведения, предоставляемые Заказчиком в порядке ст. 13 ФЗ от 13.03.2006 № 38-ФЗ «О рекламе»',b:true},{t:'Заполняется Заказчиком (наименование, номер, дата выдачи соответствующего документа, иные обязательные реквизиты)'}],
     [{t:'Сведения о наличии лицензии/сертификата'},{t:'(предоставляются в случае рекламирования товаров, услуг на производство и (или) реализацию которых требуется получение лицензии или прохождение обязательной сертификации)'}]
   ]]);
-  // Приложение 3 (ФОРМА — пустой бланк ТЗ)
-  B.push(['pagebreak']);
+  // Приложение 3 (ФОРМА — пустой бланк ТЗ; на том же листе)
   B.push(['apphdr','Приложение 3 к договору']);
   B.push(['apphdr','№ '+dl+' от '+dd]);
   B.push(['center','ФОРМА']);
@@ -560,7 +565,7 @@ function pushTz(B,t,appNum,num,date,city){
     ['Срок оплаты услуг:',s.pay]
   ]]);
   B.push(['center','Подписи сторон:']);
-  B.push(['sigtable'].concat(sigCells('____________________')));
+  B.push(['sigtable'].concat(sigCellsShort('____________________')));
 }
 function buildBlocks(){
   const num=$('docNum').value.trim(), date=dateRu($('docDate').value), city=$('docCity').value.trim();
@@ -776,8 +781,8 @@ function applyExec(){
 function refreshCliDerived(){
   $('cliPre').value=composeCliPreamble();
   $('cliName2').value=composeCliName2();
-  const fio=$('cliName').value.trim();
-  if(S.cli!=='ur' && fio) $('cliSign').value=initialsSlashName(fio);
+  if(S.cli==='ur'){const head=$('cliHead').value.trim();if(head)$('cliSign').value=initialsSlashName(head);}
+  else{const fio=$('cliName').value.trim();if(fio)$('cliSign').value=initialsSlashName(fio);}
 }
 function applyCliType(){
   $('cliUrFields').style.display=S.cli==='ur'?'block':'none';
@@ -894,7 +899,6 @@ function bind(){
     renderPreview();});
 
   $('btnWord').addEventListener('click',downloadWord);
-  $('btnPrint').addEventListener('click',()=>window.print());
 }
 
 /* ================= старт ================= */
