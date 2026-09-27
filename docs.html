@@ -436,6 +436,43 @@ function initialsSlashName(fio){
   if(parts.length===2)return '/'+parts[1][0]+'. '+parts[0]+'/';
   return fio?('/'+fio+'/'):'';
 }
+// пол по отчеству
+function fioGender(parts){const pat=parts[parts.length-1]||'';return /(вна|чна|вны|чны)$/.test(pat)?'f':'m';}
+// фамилия из родительного падежа → именительный (для подписи)
+function undeclineSurname(s,female){
+  if(!s)return s;
+  if(female){
+    if(/овой$/.test(s))return s.replace(/овой$/,'ова');
+    if(/ёвой$/.test(s))return s.replace(/ёвой$/,'ёва');
+    if(/евой$/.test(s))return s.replace(/евой$/,'ева');
+    if(/иной$/.test(s))return s.replace(/иной$/,'ина');
+    if(/ыной$/.test(s))return s.replace(/ыной$/,'ына');
+    if(/ской$/.test(s))return s.replace(/ской$/,'ская');
+    if(/цкой$/.test(s))return s.replace(/цкой$/,'цкая');
+    if(/ой$/.test(s))return s.replace(/ой$/,'ая');
+    return s;
+  }
+  if(/ского$/.test(s))return s.replace(/ского$/,'ский');
+  if(/цкого$/.test(s))return s.replace(/цкого$/,'цкий');
+  if(/ого$/.test(s))return s.replace(/ого$/,'ой');
+  if(/его$/.test(s))return s.replace(/его$/,'ий');
+  if(/ёва$/.test(s))return s.replace(/ёва$/,'ёв');
+  if(/ева$/.test(s))return s.replace(/ева$/,'ев');
+  if(/ова$/.test(s))return s.replace(/ова$/,'ов');
+  if(/ина$/.test(s))return s.replace(/ина$/,'ин');
+  if(/ына$/.test(s))return s.replace(/ына$/,'ын');
+  if(/[бвгдзклмнпрстфхцчшщ]а$/.test(s))return s.replace(/а$/,'');
+  return s;
+}
+// подпись из ФИО в РОДИТЕЛЬНОМ падеже (фамилия приводится к именительному)
+function signFromGenitive(fio){
+  const p=String(fio||'').trim().split(/\s+/).filter(Boolean);
+  if(!p.length)return '';
+  const sur=undeclineSurname(p[0],fioGender(p)==='f');
+  if(p.length>=3)return '/'+p[1][0]+'.'+p[2][0]+'. '+sur+'/';
+  if(p.length===2)return '/'+p[1][0]+'. '+sur+'/';
+  return '/'+sur+'/';
+}
 function dateRu(iso){
   if(!iso)return '';
   const m=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
@@ -781,7 +818,7 @@ function applyExec(){
 function refreshCliDerived(){
   $('cliPre').value=composeCliPreamble();
   $('cliName2').value=composeCliName2();
-  if(S.cli==='ur'){const head=$('cliHead').value.trim();if(head)$('cliSign').value=initialsSlashName(head);}
+  if(S.cli==='ur'){const head=$('cliHead').value.trim();if(head)$('cliSign').value=signFromGenitive(head);}
   else{const fio=$('cliName').value.trim();if(fio)$('cliSign').value=initialsSlashName(fio);}
 }
 function applyCliType(){
