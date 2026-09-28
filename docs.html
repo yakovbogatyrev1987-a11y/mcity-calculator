@@ -262,7 +262,7 @@ const BODY=[
  ['p','3.3. Заказчик обязан подписать универсально-передаточный документ (УПД) на оказание услуг и направить его Исполнителю либо направить мотивированный отказ от его подписания в течение пяти дней с момента его получения. В случае, если в указанный срок Заказчик не направил Исполнителю подписанный УПД или мотивированный отказ от его подписания, то УПД считается подписанным со стороны Заказчика в редакции Исполнителя, а услуги - оказанными надлежащим образом.'],
  ['h','4. ПОРЯДОК РАСЧЕТОВ'],
  ['p','4.1. Стоимость услуг, оказываемых Исполнителем по настоящему Договору при каждом размещении, определяется Сторонами в Техническом задании. Стоимость услуг, указанная в Техническом задании, является окончательной и изменению (пересчету) не подлежит.'],
- ['p','4.2. Стоимость услуг указана в Техническом задании с учетом НДС 5%.'],
+ ['p','4.2. Стоимость услуг указана в Техническом задании {{nds}}.'],
  ['p','4.3. Срок оплаты за оказанные услуги осуществляется в соответствии со сроками, указанными в Техническом задании.'],
  ['p','4.4. Оплата за размещение рекламно-информационного материала производится путем перечисления денежных средств на расчетный счет Исполнителя. Услуги считаются оплаченными надлежащим образом в момент зачисления денежных средств на расчетный счет Исполнителя.'],
  ['p','4.5. Исполнитель вправе не приступать, либо приостановить размещение Рекламы Заказчика в случае ненадлежащего исполнения Заказчиком обязательства по оплате услуг Исполнителя.'],
@@ -376,7 +376,7 @@ function pluralScreens(n){const d=n%10,h=n%100;if(h>=11&&h<=14)return 'экра�
 const S={mode:'dogovor', exec:'ooo', cli:'ip', tz:[]};
 function newTz(preset){
   const svc=preset==='screen'?'screen':'stend';
-  const t={appNum:'', svc:svc, service:SERVICE_TXT[svc], districts:[], screensSel:[], object:'', qty:'',
+  const t={appNum:'', appDate:new Date().toISOString().slice(0,10), svc:svc, service:SERVICE_TXT[svc], districts:[], screensSel:[], object:'', qty:'',
     formatsReg:[], formatsSouth:[], sizeLabel:svc==='screen'?'Размер макета (рх):':'Размер макета (мм):', size:svc==='screen'?'1920 х 1080':'',
     macetDate:'', place:PLACE_OPTS[0], installGroups:[], installMonths:{}, sum:'', payDate:''};
   return t;
@@ -516,6 +516,9 @@ function composeCliName2(){
   if(type==='ur')return $('cliOrgShort').value.trim()||$('cliOrgFull').value.trim();
   return $('cliName').value.trim();
 }
+// НДС: ООО «М-Сити» — с НДС 5%, ИП — без НДС
+function ndsShort(){return S.exec==='ooo'?'в т.ч. НДС 5%':'без НДС';}
+function ndsClause(){return S.exec==='ooo'?'с учетом НДС 5%':'без НДС';}
 
 /* ================= блоки документа ================= */
 // две колонки подписей: [левая строки[], правая строки[]]; строка={t,b}
@@ -557,7 +560,6 @@ function pushAppendix123(B,num,date,city){
   B.push(['btable',[4675,4675],[
     [{t:'Уполномоченное лицо, должность',b:true,a:'c'},{t:'Образец подписи, Адрес электронной почты уполномоченного сотрудника',b:true,a:'c'}],
     [{t:' '},{t:' '}],
-    [{t:' '},{t:' '}],
     [{t:' '},{t:' '}]
   ]]);
   // Приложение 2 (на том же листе, что и 1)
@@ -583,7 +585,7 @@ function pushAppendix123(B,num,date,city){
     ['Сроки предоставления готовых макетов:',''],
     ['Срок размещения Рекламы:',''],
     ['Период установки Рекламы:',''],
-    ['Стоимость работ (руб.), в т.ч. НДС 5%:',''],
+    ['Стоимость работ (руб.), '+ndsShort()+':',''],
     ['Срок оплаты услуг:','']
   ]]);
   B.push(['center','Подписи сторон']);
@@ -592,11 +594,11 @@ function pushAppendix123(B,num,date,city){
     [{t:'Заказчик:',b:true},{t:' ',b:false},{t:'_________________ /______________/',b:false},{t:'М.П.',b:false}]
   ]);
 }
-function pushTz(B,t,appNum,num,date,city){
+function pushTz(B,t,appNum,num,date,city,appCityDate){
   B.push(['apphdr','Приложение '+appNum+' к договору']);
   B.push(['apphdr','№ '+(num||'____')+' от '+(date||'____________')]);
   B.push(['center','Техническое задание на размещение рекламно-информационного материала']);
-  B.push(['citydate',city,date]);
+  B.push(['citydate',city,appCityDate!==undefined?appCityDate:date]);
   B.push(['p',execPreamble()]);
   B.push(['p',cliPreamble().replace('заключили настоящий Договор о нижеследующем:','утвердили следующее техническое задание на размещение рекламно-информационного материала:')]);
   const s=tzStrings(t);
@@ -608,7 +610,7 @@ function pushTz(B,t,appNum,num,date,city){
     ['Сроки предоставления готовых макетов:',s.macet],
     ['Срок размещения Рекламы:',t.place],
     ['Период установки Рекламы:',s.install],
-    ['Стоимость работ (руб.), в т.ч. НДС 5%:',t.sum!==''?fmtSum(t.sum):''],
+    ['Стоимость работ (руб.), '+ndsShort()+':',t.sum!==''?fmtSum(t.sum):''],
     ['Срок оплаты услуг:',s.pay]
   ]]);
   B.push(['center','Подписи сторон:']);
@@ -626,7 +628,8 @@ function buildBlocks(){
     B.push(['p',cliPreamble()]);
     const validUntil=dateRuGoda($('validUntil').value);
     BODY.forEach(x=>{
-      if(x[0]==='p' && x[1].indexOf('{{validUntil}}')>=0) B.push(['p', x[1].replace('{{validUntil}}', validUntil)]);
+      if(x[0]==='p' && (x[1].indexOf('{{validUntil}}')>=0 || x[1].indexOf('{{nds}}')>=0))
+        B.push(['p', x[1].replace('{{validUntil}}', validUntil).replace('{{nds}}', ndsClause())]);
       else B.push(x);
     });
     // подписи сторон — в две колонки, на одной странице
@@ -634,16 +637,16 @@ function buildBlocks(){
     B.push(['sigtable'].concat(sigCells('_________________')));
     // стандартные бланки (как в оригинале): Приложение 1, 2, 3
     pushAppendix123(B,num,date,city);
-    // заполненные ТЗ — Приложение 4, 5, …
+    // заполненные ТЗ — Приложение 4, 5, … (дата = дата договора, подписываются вместе)
     S.tz.forEach((t,i)=>{
       B.push(['pagebreak']);
-      pushTz(B,t,(t.appNum.trim()||String(4+i)),num,date,city);
+      pushTz(B,t,(t.appNum.trim()||String(4+i)),num,date,city,date);
     });
   } else {
-    // только приложение(я) — каждое на своей странице
+    // только приложение(я) — у каждого СВОЯ дата создания
     S.tz.forEach((t,i)=>{
       if(i>0)B.push(['pagebreak']);
-      pushTz(B,t,(t.appNum.trim()||String(i+1)),num,date,city);
+      pushTz(B,t,(t.appNum.trim()||String(i+1)),num,date,city, t.appDate?dateRu(t.appDate):date);
     });
   }
   return B;
@@ -696,19 +699,19 @@ function buildDocx(){
   const B=buildBlocks();
   B.forEach(b=>{
     const [t]=b;
-    if(t==='title'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{after:60},children:[run(b[1],{bold:true,size:30})]}));}
-    else if(t==='sub'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{after:160},children:[run(b[1],{size:26})]}));}
-    else if(t==='citydate'){children.push(new d.Paragraph({tabStops:[{type:d.TabStopType.RIGHT,position:9350}],spacing:{before:120,after:120},children:[run(b[1],{size:24}),run('\t'+b[2],{size:24})]}));}
-    else if(t==='h'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{before:200,after:120},keepNext:true,children:[run(b[1],{bold:true,size:24})]}));}
-    else if(t==='p'){children.push(new d.Paragraph({alignment:d.AlignmentType.JUSTIFIED,spacing:{after:80},children:[run(b[1],{size:24})]}));}
-    else if(t==='center'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{before:140,after:100},keepNext:true,children:[run(b[1],{bold:true,size:24})]}));}
-    else if(t==='apphdr'){children.push(new d.Paragraph({alignment:d.AlignmentType.RIGHT,children:[run(b[1],{size:24})]}));}
+    if(t==='title'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{after:40},children:[run(b[1],{bold:true,size:26})]}));}
+    else if(t==='sub'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{after:100},children:[run(b[1],{size:22})]}));}
+    else if(t==='citydate'){children.push(new d.Paragraph({tabStops:[{type:d.TabStopType.RIGHT,position:9350}],spacing:{before:80,after:80},children:[run(b[1],{size:22}),run('\t'+b[2],{size:22})]}));}
+    else if(t==='h'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{before:120,after:80},keepNext:true,children:[run(b[1],{bold:true,size:22})]}));}
+    else if(t==='p'){children.push(new d.Paragraph({alignment:d.AlignmentType.JUSTIFIED,spacing:{after:50},children:[run(b[1],{size:22})]}));}
+    else if(t==='center'){children.push(new d.Paragraph({alignment:d.AlignmentType.CENTER,spacing:{before:80,after:50},keepNext:true,children:[run(b[1],{bold:true,size:22})]}));}
+    else if(t==='apphdr'){children.push(new d.Paragraph({alignment:d.AlignmentType.RIGHT,spacing:{after:0},children:[run(b[1],{size:22})]}));}
     else if(t==='kvtable'){
       const bd={style:d.BorderStyle.SINGLE,size:4,color:'000000'};
-      const cellParas=(txt,al)=>String(txt||' ').split('\n').map(line=>new d.Paragraph({alignment:al,spacing:{before:20,after:20},children:[run(line,{size:22})]}));
+      const cellParas=(txt,al)=>String(txt||' ').split('\n').map(line=>new d.Paragraph({alignment:al,spacing:{before:0,after:0},children:[run(line,{size:22})]}));
       const rows=b[1].map(r=>new d.TableRow({cantSplit:true,children:[
-        new d.TableCell({width:{size:3740,type:d.WidthType.DXA},margins:{top:20,bottom:20,left:80,right:80},children:cellParas(r[0],d.AlignmentType.CENTER)}),
-        new d.TableCell({width:{size:5610,type:d.WidthType.DXA},margins:{top:20,bottom:20,left:80,right:80},children:cellParas(r[1],d.AlignmentType.CENTER)})
+        new d.TableCell({width:{size:3740,type:d.WidthType.DXA},margins:{top:10,bottom:10,left:80,right:80},children:cellParas(r[0],d.AlignmentType.CENTER)}),
+        new d.TableCell({width:{size:5610,type:d.WidthType.DXA},margins:{top:10,bottom:10,left:80,right:80},children:cellParas(r[1],d.AlignmentType.CENTER)})
       ]}));
       children.push(new d.Table({width:{size:9350,type:d.WidthType.DXA},columnWidths:[3740,5610],
         borders:{top:bd,bottom:bd,left:bd,right:bd,insideHorizontal:bd,insideVertical:bd},rows:rows}));
@@ -717,14 +720,14 @@ function buildDocx(){
       const bd={style:d.BorderStyle.SINGLE,size:4,color:'000000'};
       const cols=b[1];
       const rows=b[2].map(row=>new d.TableRow({cantSplit:true,children:row.map((c,ci)=>new d.TableCell({
-        width:{size:cols[ci],type:d.WidthType.DXA},margins:{top:30,bottom:30,left:80,right:80},
-        children:[new d.Paragraph({alignment:c.a==='c'?d.AlignmentType.CENTER:(c.a==='r'?d.AlignmentType.RIGHT:d.AlignmentType.LEFT),spacing:{after:20},children:[run(c.t||'',{size:22,bold:!!c.b})]})]
+        width:{size:cols[ci],type:d.WidthType.DXA},margins:{top:12,bottom:12,left:80,right:80},
+        children:[new d.Paragraph({alignment:c.a==='c'?d.AlignmentType.CENTER:(c.a==='r'?d.AlignmentType.RIGHT:d.AlignmentType.LEFT),spacing:{after:0},children:[run(c.t||'',{size:22,bold:!!c.b})]})]
       }))}));
       children.push(new d.Table({width:{size:9350,type:d.WidthType.DXA},columnWidths:cols,
         borders:{top:bd,bottom:bd,left:bd,right:bd,insideHorizontal:bd,insideVertical:bd},rows:rows}));
     }
     else if(t==='sigtable'){
-      const cellPars=lines=>lines.map(l=>new d.Paragraph({spacing:{after:20},children:[run(l.t,{size:24,bold:!!l.b})]}));
+      const cellPars=lines=>lines.map(l=>new d.Paragraph({spacing:{after:14},children:[run(l.t,{size:22,bold:!!l.b})]}));
       const none={style:d.BorderStyle.NONE,size:0,color:'FFFFFF'};
       const nb={top:none,bottom:none,left:none,right:none};
       children.push(new d.Table({width:{size:9350,type:d.WidthType.DXA},columnWidths:[4675,4675],
@@ -740,7 +743,7 @@ function buildDocx(){
   const sf=sigCellsShort('_________________');
   const noneB={style:d.BorderStyle.NONE,size:0,color:'FFFFFF'};
   const nbF={top:noneB,bottom:noneB,left:noneB,right:noneB};
-  const fcell=lines=>lines.map(l=>new d.Paragraph({spacing:{after:0},children:[run(l.t,{size:18,bold:!!l.b})]}));
+  const fcell=lines=>lines.map(l=>new d.Paragraph({spacing:{after:0},children:[run(l.t,{size:16,bold:!!l.b})]}));
   const footerTable=new d.Table({width:{size:9350,type:d.WidthType.DXA},columnWidths:[4675,4675],
     borders:{top:noneB,bottom:noneB,left:noneB,right:noneB,insideHorizontal:noneB,insideVertical:noneB},
     rows:[new d.TableRow({children:[
@@ -752,8 +755,8 @@ function buildDocx(){
     footerTable
   ]});
   const doc=new d.Document({
-    styles:{default:{document:{run:{font:F,size:24}}}},
-    sections:[{properties:{page:{margin:{top:1134,bottom:1900,left:1417,right:850,footer:340}}},footers:{default:footer},children:children}]
+    styles:{default:{document:{run:{font:F,size:22}}}},
+    sections:[{properties:{page:{margin:{top:1134,bottom:1560,left:1417,right:850,footer:280}}},footers:{default:footer},children:children}]
   });
   return doc;
 }
@@ -810,7 +813,9 @@ function renderTz(){
     let h=
       '<div class="th"><b>Тех. задание '+(i+1)+'</b><button class="del" data-del="'+i+'">Удалить</button></div>'+
       '<div class="row"><div><label>№ приложения</label><input data-f="appNum" data-i="'+i+'" value="'+esc(t.appNum)+'" placeholder="'+autoNum+'"></div>'+
-      '<div><label>&nbsp;</label><div class="hint" style="margin:8px 0 0">к договору № '+esc($('docNum').value.trim()||'—')+'</div></div></div>'+
+      (S.mode==='prilozhenie'
+        ? '<div><label>Дата приложения</label><input type="date" data-f="appDate" data-i="'+i+'" value="'+esc(t.appDate)+'"></div></div>'
+        : '<div><label>&nbsp;</label><div class="hint" style="margin:8px 0 0">к договору № '+esc($('docNum').value.trim()||'—')+'</div></div></div>')+
       // наименование услуг — переключатель
       '<label>Наименование услуг</label>'+
       '<div class="fmtgroup"><button data-svc="stend" data-i="'+i+'" class="'+(isStend?'on':'')+'">Стенды</button>'+
