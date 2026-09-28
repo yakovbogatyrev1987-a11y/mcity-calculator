@@ -678,6 +678,12 @@ function renderPreview(){
     }
     else if(t==='pagebreak')h+='<div class="pb">— разрыв страницы —</div>';
   });
+  // образец колонтитула (внизу каждой страницы Word)
+  const sf=sigCellsShort('_________________');
+  const fcol=lines=>lines.map(l=>'<p style="margin:1px 0;font-size:13px">'+(l.b?'<b>'+esc(l.t)+'</b>':esc(l.t))+(l.t===''?'&nbsp;':'')+'</p>').join('');
+  h+='<div style="margin-top:26px;border-top:2px dashed #bbb;padding-top:8px">'
+    +'<div style="font-family:sans-serif;font-size:11px;color:#999;margin-bottom:6px">↓ Колонтитул — печатается внизу КАЖДОЙ страницы</div>'
+    +'<table class="sigtable"><tr><td>'+fcol(sf[0])+'</td><td>'+fcol(sf[1])+'</td></tr></table></div>';
   $('paper').innerHTML=h;
 }
 
@@ -730,9 +736,24 @@ function buildDocx(){
     }
     else if(t==='pagebreak'){children.push(new d.Paragraph({children:[new d.PageBreak()]}));}
   });
+  // колонтитул подписи (внизу каждой страницы)
+  const sf=sigCellsShort('_________________');
+  const noneB={style:d.BorderStyle.NONE,size:0,color:'FFFFFF'};
+  const nbF={top:noneB,bottom:noneB,left:noneB,right:noneB};
+  const fcell=lines=>lines.map(l=>new d.Paragraph({spacing:{after:0},children:[run(l.t,{size:18,bold:!!l.b})]}));
+  const footerTable=new d.Table({width:{size:9350,type:d.WidthType.DXA},columnWidths:[4675,4675],
+    borders:{top:noneB,bottom:noneB,left:noneB,right:noneB,insideHorizontal:noneB,insideVertical:noneB},
+    rows:[new d.TableRow({children:[
+      new d.TableCell({width:{size:4675,type:d.WidthType.DXA},borders:nbF,children:fcell(sf[0])}),
+      new d.TableCell({width:{size:4675,type:d.WidthType.DXA},borders:nbF,children:fcell(sf[1])})
+    ]})]});
+  const footer=new d.Footer({children:[
+    new d.Paragraph({border:{top:{style:d.BorderStyle.SINGLE,size:4,color:'AAAAAA',space:4}},spacing:{after:20},children:[run('',{size:4})]}),
+    footerTable
+  ]});
   const doc=new d.Document({
     styles:{default:{document:{run:{font:F,size:24}}}},
-    sections:[{properties:{page:{margin:{top:1134,bottom:1134,left:1417,right:850}}},children:children}]
+    sections:[{properties:{page:{margin:{top:1134,bottom:1900,left:1417,right:850,footer:340}}},footers:{default:footer},children:children}]
   });
   return doc;
 }
