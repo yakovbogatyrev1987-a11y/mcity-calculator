@@ -384,7 +384,8 @@ function newTz(preset){
 function dmy(iso){ if(!iso)return ''; const p=iso.split('-'); return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):''; }
 function pad2(n){return String(n).padStart(2,'0');}
 let validUntilManual=false;
-function plusOneYear(iso){if(!iso)return '';const d=new Date(iso+'T00:00:00');if(isNaN(d))return '';d.setFullYear(d.getFullYear()+1);return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());}
+// срок действия по умолчанию: +1 год, но последний день ПРЕДЫДУЩЕГО месяца (15.08.2026 → 31.07.2027)
+function defaultValidUntil(iso){if(!iso)return '';const d=new Date(iso+'T00:00:00');if(isNaN(d))return '';const e=new Date(d.getFullYear()+1,d.getMonth(),0);return e.getFullYear()+'-'+pad2(e.getMonth()+1)+'-'+pad2(e.getDate());}
 // строка «Период установки»: у каждой группы СВОЙ месяц, сортировка по реальной дате начала
 function computeInstall(t){
   const dmy2=(yy,mm,dd)=>pad2(dd)+'.'+pad2(mm)+'.'+yy;
@@ -853,7 +854,7 @@ function applyMode(){
 function bind(){
   // дата по умолчанию — сегодня
   $('docDate').value=new Date().toISOString().slice(0,10);
-  $('validUntil').value=plusOneYear($('docDate').value);   // по умолчанию — год вперёд
+  $('validUntil').value=defaultValidUntil($('docDate').value);   // по умолчанию — год вперёд
 
   $('modeSeg').addEventListener('click',e=>{const b=e.target.closest('button[data-m]');if(!b)return;
     [...$('modeSeg').children].forEach(x=>x.classList.remove('on'));b.classList.add('on');
@@ -874,7 +875,7 @@ function bind(){
   // номер договора влияет и на подсказку в ТЗ
   $('docNum').addEventListener('input',()=>{renderTz();renderPreview();});
   // дата договора: подтягиваем «действует до» на год вперёд (пока не задано вручную)
-  $('docDate').addEventListener('input',()=>{if(!validUntilManual)$('validUntil').value=plusOneYear($('docDate').value);renderPreview();});
+  $('docDate').addEventListener('input',()=>{if(!validUntilManual)$('validUntil').value=defaultValidUntil($('docDate').value);renderPreview();});
   // «действует до» — если правят вручную, больше не пересчитываем
   $('validUntil').addEventListener('input',()=>{validUntilManual=true;});
   // остальные поля — просто перерисовка предпросмотра
