@@ -60,7 +60,9 @@
   .tz .th b{font-size:13px}
   .tz .del{border:none;background:#f3f4f6;color:#b00;border-radius:7px;padding:4px 9px;cursor:pointer;font-size:12px}
   .addbtn{width:100%;padding:9px;border:1px dashed var(--red);color:var(--red);background:#fff;border-radius:9px;cursor:pointer;font:inherit;font-weight:600}
-  .genbar{position:sticky;bottom:0;background:#fff;border-radius:12px;box-shadow:0 -2px 14px rgba(0,0,0,.08);padding:12px;display:flex;gap:10px}
+  .genbar{position:sticky;bottom:0;background:#fff;border-radius:12px;box-shadow:0 -2px 14px rgba(0,0,0,.08);padding:12px;display:flex;flex-direction:column;gap:8px}
+  .daystat{text-align:center;font-size:12px;color:var(--mut)}
+  .daystat b{color:var(--red);font-size:14px}
   .genbar button{flex:1;padding:12px;border:none;border-radius:10px;font:inherit;font-weight:700;font-size:14px;cursor:pointer}
   .bWord{background:#1b5e20;color:#fff}
   .bPrint{background:#1b1f27;color:#fff}
@@ -176,6 +178,7 @@
 
     <div class="genbar">
       <button class="bWord" id="btnWord">Скачать Word</button>
+      <div class="daystat" id="dayStat"></div>
     </div>
   </div>
 
@@ -760,14 +763,31 @@ function buildDocx(){
   });
   return doc;
 }
+/* ===== счётчик документов за день (локально в браузере) ===== */
+function todayKey(){return new Date().toISOString().slice(0,10);}
+function readStat(){
+  try{const s=JSON.parse(localStorage.getItem('mcity_docstat')||'{}');
+    if(s.date!==todayKey())return {date:todayKey(),dogovor:0,prilozhenie:0};
+    return {date:s.date,dogovor:s.dogovor||0,prilozhenie:s.prilozhenie||0};
+  }catch(e){return {date:todayKey(),dogovor:0,prilozhenie:0};}
+}
+function writeStat(s){try{localStorage.setItem('mcity_docstat',JSON.stringify(s));}catch(e){}}
+function renderStat(){
+  const s=readStat(), total=s.dogovor+s.prilozhenie;
+  $('dayStat').innerHTML='📄 Сегодня сгенерировано: <b>'+total+'</b> · договоров: '+s.dogovor+' · приложений: '+s.prilozhenie;
+}
+function bumpStat(){const s=readStat();if(S.mode==='prilozhenie')s.prilozhenie++;else s.dogovor++;writeStat(s);renderStat();}
+
 function downloadWord(){
   const bar=document.querySelector('.form'); bar.classList.add('busy');
   const doc=buildDocx();
   docx.Packer.toBlob(doc).then(blob=>{
     const num=$('docNum').value.trim().replace(/[^\wа-яё0-9-]/gi,'_');
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Договор № '+num+'.docx';
+    const fname=(S.mode==='prilozhenie'?'Приложение к договору № ':'Договор № ')+num+'.docx';
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;
     document.body.appendChild(a);a.click();a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    bumpStat();
     bar.classList.remove('busy');
   }).catch(e=>{alert('Ошибка формирования Word: '+e.message);bar.classList.remove('busy');});
 }
@@ -991,6 +1011,7 @@ refreshCliDerived();
 bind();
 renderTz();
 renderPreview();
+renderStat();
 </script>
 </body>
 </html>
