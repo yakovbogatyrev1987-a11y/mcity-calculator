@@ -88,12 +88,33 @@
   .paper table.sigtable td{border:none;width:50%;vertical-align:top;padding:2px 12px 2px 0;font-size:14px}
   .paper table.sigtable p{margin:1px 0;text-align:left}
   .busy{opacity:.5;pointer-events:none}
+  .genbar .genrow{display:flex;gap:8px}
+  /* ===== печать / сохранение в PDF ===== */
+  @media print{
+    @page{size:A4;margin:16mm 15mm 30mm 25mm}
+    html,body{height:auto;overflow:visible}
+    body{display:block;background:#fff}
+    .top,.form{display:none!important}
+    .layout{display:block;padding:0;margin:0;max-width:none}
+    .prev{height:auto;overflow:visible;padding:0}
+    .paper{max-width:none;margin:0;padding:0;box-shadow:none;border-radius:0;font-size:11pt;line-height:1.35}
+    .paper .t{font-size:15pt}
+    .paper .st{font-size:12pt}
+    .paper h3{font-size:12pt;break-after:avoid}
+    .paper td,.paper th{font-size:10pt;padding:4px 6px}
+    .paper tr{break-inside:avoid}
+    .paper .pb{visibility:hidden;height:0;margin:0;border:none;break-after:page;page-break-after:always}
+    .paper .ftr{margin:0!important;border:none!important;padding:0!important}
+    .paper .ftrhint{display:none}
+    .paper .ftrsig{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #999;padding-top:5px}
+    .paper .ftrsig p{font-size:8pt!important}
+  }
 </style>
 </head>
 <body>
 <div class="top">
   <div class="logo">M<span>·</span>CITY</div>
-  <div><h1>Документы</h1><div class="sub">Договор и технические задания · формирование в Word</div></div>
+  <div><h1>Документы</h1><div class="sub">Договор и технические задания · формирование в Word и PDF</div></div>
   <div class="nav">
     <a href="index.html">Калькулятор КП</a>
     <a href="docs.html" class="active">Документы</a>
@@ -177,7 +198,11 @@
     </div>
 
     <div class="genbar">
-      <button class="bWord" id="btnWord">Скачать Word</button>
+      <div class="genrow">
+        <button class="bWord" id="btnWord">Скачать Word</button>
+        <button class="bPrint" id="btnPdf">Скачать PDF</button>
+      </div>
+      <div class="hint" style="text-align:center">PDF: в открывшемся окне печати выберите «Сохранить как PDF»</div>
       <div class="daystat" id="dayStat"></div>
     </div>
   </div>
@@ -687,9 +712,9 @@ function renderPreview(){
   // образец колонтитула (внизу каждой страницы Word)
   const sf=sigCellsShort('_________________');
   const fcol=lines=>lines.map(l=>'<p style="margin:1px 0;font-size:13px">'+(l.b?'<b>'+esc(l.t)+'</b>':esc(l.t))+(l.t===''?'&nbsp;':'')+'</p>').join('');
-  h+='<div style="margin-top:26px;border-top:2px dashed #bbb;padding-top:8px">'
-    +'<div style="font-family:sans-serif;font-size:11px;color:#999;margin-bottom:6px">↓ Колонтитул — печатается внизу КАЖДОЙ страницы</div>'
-    +'<table class="sigtable"><tr><td>'+fcol(sf[0])+'</td><td>'+fcol(sf[1])+'</td></tr></table></div>';
+  h+='<div class="ftr" style="margin-top:26px;border-top:2px dashed #bbb;padding-top:8px">'
+    +'<div class="ftrhint" style="font-family:sans-serif;font-size:11px;color:#999;margin-bottom:6px">↓ Колонтитул — печатается внизу КАЖДОЙ страницы</div>'
+    +'<table class="sigtable ftrsig"><tr><td>'+fcol(sf[0])+'</td><td>'+fcol(sf[1])+'</td></tr></table></div>';
   $('paper').innerHTML=h;
 }
 
@@ -790,6 +815,18 @@ function downloadWord(){
     bumpStat();
     bar.classList.remove('busy');
   }).catch(e=>{alert('Ошибка формирования Word: '+e.message);bar.classList.remove('busy');});
+}
+
+function downloadPdf(){
+  const num=$('docNum').value.trim().replace(/[^\wа-яё0-9-]/gi,'_');
+  const oldTitle=document.title;
+  // имя файла PDF берётся из заголовка страницы
+  document.title=(S.mode==='prilozhenie'?'Приложение к договору № ':'Договор № ')+num;
+  const restore=()=>{document.title=oldTitle;window.removeEventListener('afterprint',restore);};
+  window.addEventListener('afterprint',restore);
+  setTimeout(restore,60000); // страховка, если afterprint не сработает
+  bumpStat();
+  window.print();
 }
 
 /* ================= рендер формы ТЗ ================= */
@@ -1001,6 +1038,7 @@ function bind(){
     renderPreview();});
 
   $('btnWord').addEventListener('click',downloadWord);
+  $('btnPdf').addEventListener('click',downloadPdf);
 }
 
 /* ================= старт ================= */
