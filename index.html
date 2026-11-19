@@ -142,7 +142,7 @@
     transition:.25s;z-index:50;box-shadow:var(--shadow)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-  @page{margin:10mm}
+  @page{size:A4 portrait;margin:10mm}
   @media print{ body{background:#fff} .wrap{display:none} #printArea{display:block !important} }
   #printArea{display:none}
 </style>
@@ -213,7 +213,7 @@
         <div class="hd" data-card="place">📍 Примерное место на стенде <span class="toggle" id="tgPlace">свернуть ▲</span></div>
         <div class="bd" id="bdPlace">
           <div id="matrixBox"></div>
-          <div class="hint">Кликните ячейку — это «примерное место» рекламы клиента. Оно попадёт в КП, чтобы клиенту было наглядно.</div>
+          <div class="hint">При выборе 1–2 районов место подставляется автоматически (самый крупный формат) — кликом по ячейке можно изменить. Оно попадёт в КП, чтобы клиенту было наглядно.</div>
         </div>
       </div>
 
@@ -493,6 +493,21 @@ function renderPlace(){
   if(stdSel)h+=`<div class="matrix"><div class="ttl">Обычные стенды — отметьте места (можно несколько):</div>${matrixSVG("std",S.slotsStd,true)}</div>`;
   if(southSel)h+=`<div class="matrix" style="margin-top:14px"><div class="ttl">Южный берег / Образцово (можно несколько):</div>${matrixSVG("south",S.slotsSouth,true)}</div>`;
   $("#matrixBox").innerHTML=h;
+}
+
+// автовыбор «примерного места»: при 1–2 выбранных районах ставим место с самым крупным форматом
+function autoPlace(){
+  const n=S.stands.size;
+  if(n===0){S.slotsStd.clear();S.slotsSouth.clear();return;}
+  if(n>2)return;   // 3+ районов — место выбирается вручную
+  const best={std:-1,south:-1};
+  S.stands.forEach((f,i)=>{const k=isSouth(i)?"south":"std"; if(f>best[k])best[k]=f;});
+  [["std",S.slotsStd],["south",S.slotsSouth]].forEach(([k,set])=>{
+    set.clear();
+    const bf=best[k]; if(bf<0)return;
+    const id=CFG.formats[bf].id, idx=MATRIX[k].slots.findIndex(s=>s[4]===id);
+    if(idx>=0)set.add(idx);
+  });
 }
 
 function renderThumbs(){
@@ -819,8 +834,8 @@ function buildPrint(){
   const sec=t=>`<div style="background:${RED};color:#fff;font-weight:800;font-size:15px;padding:8px 14px;border-radius:7px;margin:22px 0 12px">${t}</div>`;
   const th=`background:#1b1f27;color:#fff;font-size:12px;text-align:left;padding:8px 10px`;
   const td=`padding:8px 10px;border-bottom:1px solid #e6e8ec;font-size:13px`;
-  const mediaCard=(t,v)=>`<div style="flex:1;min-width:120px;background:#f6f8fb;border:1px solid #e2e6ec;border-radius:10px;padding:12px 14px;page-break-inside:avoid;break-inside:avoid">
-    <div style="color:#666;font-size:12px">${t}</div><div style="font-size:20px;font-weight:800;color:${RED}">${v}</div></div>`;
+  const mediaCard=(t,v)=>`<div style="flex:1;min-width:120px;background:#f6f8fb;border:1px solid #e2e6ec;border-radius:10px;padding:12px 14px;page-break-inside:avoid;break-inside:avoid;display:flex;flex-direction:column">
+    <div style="color:#666;font-size:12px;flex:1 1 auto;margin-bottom:4px">${t}</div><div style="font-size:20px;font-weight:800;color:${RED};line-height:1.1">${v}</div></div>`;
   const dS=r.standsDisc||0, dC=r.screensDisc||0;
   // ячейка цены: при скидке показываем старую цену (зачёркнута) и новую рядом
   const priceCell=(val,disc)=> disc>0
@@ -842,7 +857,7 @@ function buildPrint(){
         <td style="${td};text-align:right">${x.res?fmt(x.contacts):'—'}</td>
         <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,x.disc!=null?x.disc:disc)}${x.disc>0?' <span style="color:'+RED+';font-size:10px">−'+x.disc+'%</span>':''}</td></tr>`).join("")+
       (withPos&&r.posSum?`<tr><td style="${td}" colspan="4">⭐ Позиционирование на плакате (${posBreakText(r.posBreak)})</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.posSum,disc)}</td></tr>`:"")+`</table>`;
-  let standsHtml="";
+  let standsHtml="", visualHtml="";   // visualHtml — матрица + фото: выводится ПОД итогами
   if(r.st.length){
     if(r.stM){
       standsHtml+=sec("Стенды в лифтах · акция на 2 месяца");
@@ -851,8 +866,9 @@ function buildPrint(){
         if(M.st.length>1)standsHtml+=`<div style="font-weight:800;font-size:13px;margin:2px 0 8px;text-align:right;border-top:1px solid #e6e8ec;padding-top:6px">Итого за ${M.label.toLowerCase()}: ${fmt(M.total)} ₽</div>`;
       });
       if(r.giftStands>0)standsHtml+=`<div style="color:#1a9e6c;font-size:12px">🎁 Акция: ${r.giftStands} ${plural(r.giftStands,"район","района","районов")} в подарок.</div>`;
+      standsHtml+=`<div style="font-weight:800;font-size:13px;margin:6px 0 2px;text-align:right">Всего стендов: ${wStend(r.standsUnits)}</div>`;
     } else {
-      standsHtml+=sec("Стенды в лифтах")+standsRows(r.st,dS,true);
+      standsHtml+=sec("Стенды в лифтах")+standsRows(r.st,dS,true)+`<div style="font-weight:800;font-size:13px;margin:6px 0 2px;text-align:right">Всего стендов: ${wStend(r.standsUnits)}</div>`;
       if(r.giftStands>0)standsHtml+=`<div style="color:#1a9e6c;font-size:12px">🎁 Акция: ${r.giftStands} ${plural(r.giftStands,"район","района","районов")} в подарок.</div>`;
       if(S.standsPeriods>1)standsHtml+=`<div style="color:#666;font-size:12px">Срок: ${S.standsPeriods} × 30 дней (−7 дней в подарок на период).</div>`;
     }
@@ -865,7 +881,7 @@ function buildPrint(){
     blocks.forEach(b=>{
       if(b.mat){
         // позиционирование выбрано → матрица и фото в один ряд, одного размера
-        standsHtml+=`<div style="margin-top:14px;page-break-inside:avoid"><div style="font-weight:700;font-size:13px;margin-bottom:6px">${b.t}</div>
+        visualHtml+=`<div style="margin-top:14px;page-break-inside:avoid"><div style="font-weight:700;font-size:13px;margin-bottom:6px">${b.t}</div>
           <div style="display:flex;gap:16px;align-items:flex-start;justify-content:center;flex-wrap:wrap">
             <div style="flex:1;min-width:220px;text-align:center"><div style="font-size:11px;color:#888;margin-bottom:5px">Примерное место (позиционирование)</div>
               <div style="height:${PH}px;display:flex;align-items:center;justify-content:center">${matH(b.mat)}</div></div>
@@ -874,7 +890,7 @@ function buildPrint(){
           </div></div>`;
       } else {
         // без позиционирования → фото крупнее и по центру
-        standsHtml+=`<div style="margin-top:14px;page-break-inside:avoid;text-align:center"><div style="font-weight:700;font-size:13px;margin-bottom:6px">${b.t}</div>
+        visualHtml+=`<div style="margin-top:14px;page-break-inside:avoid;text-align:center"><div style="font-weight:700;font-size:13px;margin-bottom:6px">${b.t}</div>
           <div style="font-size:11px;color:#888;margin-bottom:5px">Как выглядит реклама в лифте</div>
           <img src="${b.photo}" style="height:340px;max-width:100%;object-fit:contain;border-radius:8px;border:1px solid #ddd"></div>`;
       }
@@ -951,7 +967,7 @@ function buildPrint(){
         <td style="${aTd};text-align:right">${x[1]}</td><td style="${aTd};text-align:right">${fmt(x[2])}</td>
         <td style="${aTd};text-align:right">${fmt(x[3])}</td><td style="${aTd};text-align:right">${fmt(x[3]*V)}</td>
         <td style="${aTd};text-align:center">${x[4]||"—"}</td></tr>`;}).join("");
-    return `<div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:5px">📍 ${name} — адреса стендов</div>
+    return `<div style="margin-top:16px;page-break-inside:avoid;break-inside:avoid"><div style="font-weight:700;font-size:13px;margin-bottom:5px">📍 ${name} — адреса стендов</div>
       <table style="width:100%;border-collapse:collapse">
       <tr><th style="${aTh};text-align:center">№</th><th style="${aTh}">Адрес</th><th style="${aTh};text-align:right">Рамок</th>
         <th style="${aTh};text-align:right">Квартир</th><th style="${aTh};text-align:right">Жителей</th>
@@ -966,7 +982,7 @@ function buildPrint(){
       return `<tr><td style="${aTd};text-align:center">${i+1}</td><td style="${aTd}">${x[0]}</td>
         <td style="${aTd};text-align:right">${x[1]}</td><td style="${aTd};text-align:right">${fmt(x[2])}</td>
         <td style="${aTd};text-align:right">${fmt(x[3])}</td><td style="${aTd};text-align:right">${fmt(x[3]*V)}</td></tr>`;}).join("");
-    return `<div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:5px">📍 ${name} — адреса экранов</div>
+    return `<div style="margin-top:16px;page-break-inside:avoid;break-inside:avoid"><div style="font-weight:700;font-size:13px;margin-bottom:5px">📍 ${name} — адреса экранов</div>
       <table style="width:100%;border-collapse:collapse">
       <tr><th style="${aTh};text-align:center">№</th><th style="${aTh}">Адрес</th><th style="${aTh};text-align:right">Мониторов</th>
         <th style="${aTh};text-align:right">Помещений</th><th style="${aTh};text-align:right">Жителей</th>
@@ -996,7 +1012,7 @@ function buildPrint(){
       </div>
     </div>
     ${S.client?`<div style="margin-top:14px;font-size:15px">Для: <b>${S.client}</b></div>`:""}
-    ${standsHtml}${screensHtml}${totalHtml}${picsHtml}${addrHtml}
+    ${standsHtml}${screensHtml}${totalHtml}${visualHtml}${picsHtml}${addrHtml}
     <div style="margin-top:18px;color:#999;font-size:11px;border-top:1px solid #eee;padding-top:10px">
       Предложение носит информационный характер и не является публичной офертой. Цены действительны на ${today}.</div>
   </div>`;
@@ -1115,7 +1131,7 @@ function bind(){
   const onStandClick=e=>{
     const fb=e.target.closest("[data-fmtfor]");
     if(fb){const i=+fb.dataset.fmtfor,f=+fb.dataset.f,m=+fb.dataset.m; if(DATA.stands[i].p[f]==null)return;
-      stMap(m).set(i,f); renderStands(searchFor(m),m); render(); return;}
+      stMap(m).set(i,f); autoPlace(); renderStands(searchFor(m),m); render(); return;}
     const gb=e.target.closest("[data-giftstand]");
     if(gb){const i=+gb.dataset.giftstand,m=+gb.dataset.m; const g=stGifts(m); g.has(i)?g.delete(i):g.add(i);
       renderStands(searchFor(m),m); render(); return;}
@@ -1123,7 +1139,7 @@ function bind(){
     if(head){const it=head.closest("[data-stand]"); const i=+it.dataset.stand,m=+it.dataset.m; const map=stMap(m),g=stGifts(m);
       if(map.has(i)){map.delete(i);g.delete(i);}
       else{const def=DATA.stands[i].p[2]!=null?2:(DATA.stands[i].p[3]!=null?3:0);map.set(i,def);}
-      renderStands(searchFor(m),m);render();}
+      autoPlace(); renderStands(searchFor(m),m);render();}
   };
   $("#standsList").addEventListener("click",onStandClick);
   $("#standsList2").addEventListener("click",onStandClick);
