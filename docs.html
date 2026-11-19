@@ -234,8 +234,7 @@ const EXEC={
     pre:'Индивидуальный предприниматель Богатырев Яков Александрович, действующий на основании Листа записи ЕГРИП, именуемый в дальнейшем «Исполнитель», с одной стороны, и',
     name:'ИП Богатырев Яков Александрович',
     sign:'/Я.А. Богатырев/',
-    req:['Индивидуальный предприниматель Богатырев Яков Александрович',
-         'ИНН 245307316300',
+    req:['ИНН 245307316300',
          'Р/с 40802810620000150488',
          'Банк: ООО «Банк Точка»',
          'К/с 30101810745374525104',
@@ -245,8 +244,7 @@ const EXEC={
     pre:'Индивидуальный предприниматель Богатырева Кристина Олеговна, действующая на основании Листа записи ЕГРИП, именуемая в дальнейшем «Исполнитель», с одной стороны, и',
     name:'ИП Богатырева Кристина Олеговна',
     sign:'/К.О. Богатырева/',
-    req:['Индивидуальный предприниматель Богатырева Кристина Олеговна',
-         'Юридический адрес: 660049, Россия, Красноярский край, г. Красноярск, ул. Марковского, д. 43, кв. 14',
+    req:['Юридический адрес: 660049, Россия, Красноярский край, г. Красноярск, ул. Марковского, д. 43, кв. 14',
          'ИНН 245304538880',
          'ОГРНИП 322246800029896',
          'Р/с 40802810823270003338',
@@ -260,7 +258,7 @@ const EXEC={
 // заголовки секций — верхний регистр; остальное — обычные пункты (justify)
 const BODY=[
  ['h','1. ПРЕДМЕТ ДОГОВОРА'],
- ['p','1.1. Заказчик поручает, а Исполнитель принимает на себя обязательство по размещению рекламно-информационного материала (Рекламы) Заказчика согласно Техническим заданиям (по форме Приложения № 3 к настоящему договору), согласованным сторонами, а Заказчик обязуется принять и оплатить эти услуги.'],
+ ['p','1.1. Заказчик поручает, а Исполнитель принимает на себя обязательство по размещению рекламно-информационного материала (Рекламы) Заказчика согласно Техническим заданиям (Приложения к настоящему договору), согласованным сторонами, а Заказчик обязуется принять и оплатить эти услуги.'],
  ['p','1.2. Вид рекламной информации, способ, место ее размещения, сроки (периодичность) размещения, стоимость услуг и другие условия устанавливаются в Технических заданиях, являющихся неотъемлемой частью настоящего договора.'],
  ['h','2. ПРАВА И ОБЯЗАННОСТИ СТОРОН'],
  ['p','2.1. Права и обязанности Исполнителя:'],
@@ -409,7 +407,7 @@ function newTz(preset){
   const svc=preset==='screen'?'screen':'stend';
   const t={appNum:'', appDate:new Date().toISOString().slice(0,10), svc:svc, service:SERVICE_TXT[svc], districts:[], screensSel:[], object:'', qty:'',
     formatsReg:[], formatsSouth:[], sizeLabel:svc==='screen'?'Размер макета (рх):':'Размер макета (мм):', size:svc==='screen'?'1920 х 1080':'',
-    macetDate:'', place:PLACE_OPTS[0], installGroups:[], installMonths:{}, sum:'', payDate:''};
+    macetDate:'', place:PLACE_OPTS[0], shows:'720', installGroups:[], installMonths:{}, sum:'', payDate:''};
   return t;
 }
 function dmy(iso){ if(!iso)return ''; const p=iso.split('-'); return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):''; }
@@ -454,6 +452,8 @@ function recomputeScreens(t){
   if(arr.length===0){t.object='';t.qty='';}
   else if(arr.length===1){t.object=arr[0].name;t.qty=arr[0].count+' '+pluralScreens(arr[0].count);}
   else{t.object=arr.map(r=>r.name).join('\n');t.qty=arr.map(r=>r.name+' – '+r.count+' '+pluralScreens(r.count)).join('\n');}
+  // нестандартное число показов (1440/2160) — фиксируем в «Район / Маршрут»
+  if(t.shows && t.shows!=='720'){t.object=(t.object?t.object+'\n':'')+'Количество показов в сутки: '+t.shows;}
 }
 // пересчёт «Размер макета» из выбранных форматов ОБЕИХ матриц
 function recomputeFormats(t){
@@ -580,8 +580,8 @@ function tzStrings(t){
   const pay=t.payDate?('До '+dmy(t.payDate)+' г.'):'';
   return {macet,install,pay};
 }
-// стандартные бланки-приложения 1,2,3 (как в оригинале договора)
-function pushAppendix123(B,num,date,city){
+// стандартные бланки-приложения 1,2 (как в оригинале договора)
+function pushAppendix12(B,num,date,city){
   const dl=(num||'____'), dd=(date||'____________');
   // Приложение 1
   B.push(['pagebreak']);
@@ -602,28 +602,6 @@ function pushAppendix123(B,num,date,city){
     [{t:'Обязательные сведения, предоставляемые Заказчиком в порядке ст. 13 ФЗ от 13.03.2006 № 38-ФЗ «О рекламе»',b:true},{t:'Заполняется Заказчиком (наименование, номер, дата выдачи соответствующего документа, иные обязательные реквизиты)'}],
     [{t:'Сведения о наличии лицензии/сертификата'},{t:'(предоставляются в случае рекламирования товаров, услуг на производство и (или) реализацию которых требуется получение лицензии или прохождение обязательной сертификации)'}]
   ]]);
-  // Приложение 3 (ФОРМА — пустой бланк ТЗ; на том же листе)
-  B.push(['apphdr','Приложение 3 к договору']);
-  B.push(['apphdr','№ '+dl+' от '+dd]);
-  B.push(['center','ФОРМА']);
-  B.push(['center','Техническое задание на размещение рекламно-информационного материала']);
-  B.push(['citydate',city,'«___» ________ 20__ г.']);
-  B.push(['kvtable',[
-    ['Наименование услуг',''],
-    ['Район / Маршрут:',''],
-    ['Количество (шт.):',''],
-    ['Размер макета (мм):',''],
-    ['Сроки предоставления готовых макетов:',''],
-    ['Срок размещения Рекламы:',''],
-    ['Период установки Рекламы:',''],
-    ['Стоимость работ (руб.), '+ndsShort()+':',''],
-    ['Срок оплаты услуг:','']
-  ]]);
-  B.push(['center','Подписи сторон']);
-  B.push(['sigtable',
-    [{t:'Исполнитель:',b:true},{t:' ',b:false},{t:'_________________ /______________/',b:false},{t:'М.П.',b:false}],
-    [{t:'Заказчик:',b:true},{t:' ',b:false},{t:'_________________ /______________/',b:false},{t:'М.П.',b:false}]
-  ]);
 }
 function pushTz(B,t,appNum,num,date,city,appCityDate){
   B.push(['apphdr','Приложение '+appNum+' к договору']);
@@ -666,12 +644,12 @@ function buildBlocks(){
     // подписи сторон — в две колонки, на одной странице
     B.push(['h','ЮРИДИЧЕСКИЕ АДРЕСА И ПОДПИСИ СТОРОН:']);
     B.push(['sigtable'].concat(sigCells('_________________')));
-    // стандартные бланки (как в оригинале): Приложение 1, 2, 3
-    pushAppendix123(B,num,date,city);
-    // заполненные ТЗ — Приложение 4, 5, … (дата = дата договора, подписываются вместе)
+    // стандартные бланки (как в оригинале): Приложение 1, 2
+    pushAppendix12(B,num,date,city);
+    // заполненные ТЗ — Приложение 3, 4, … (дата = дата договора, подписываются вместе)
     S.tz.forEach((t,i)=>{
       B.push(['pagebreak']);
-      pushTz(B,t,(t.appNum.trim()||String(4+i)),num,date,city,date);
+      pushTz(B,t,(t.appNum.trim()||String(3+i)),num,date,city,date);
     });
   } else {
     // только приложение(я) — у каждого СВОЯ дата создания
@@ -868,7 +846,7 @@ function renderTz(){
   const wrap=$('tzList');wrap.innerHTML='';
   S.tz.forEach((t,i)=>{
     const div=document.createElement('div');div.className='tz';
-    const autoNum=S.mode==='dogovor'?(4+i):(i+1);
+    const autoNum=S.mode==='dogovor'?(3+i):(i+1);
     const isStend=t.svc!=='screen';
     let h=
       '<div class="th"><b>Тех. задание '+(i+1)+'</b><button class="del" data-del="'+i+'">Удалить</button></div>'+
@@ -898,6 +876,11 @@ function renderTz(){
         ? '<input data-f="place" data-i="'+i+'" value="'+esc(t.place)+'">'
         : '<div class="fmtgroup"><button data-place="0" data-i="'+i+'" class="'+(t.place===PLACE_OPTS[1]?'':'on')+'">1 месяц</button>'+
           '<button data-place="1" data-i="'+i+'" class="'+(t.place===PLACE_OPTS[1]?'on':'')+'">2 недели</button></div>')+
+      // количество показов в сутки (только экраны)
+      (!isStend
+        ? '<label>Количество показов в сутки</label>'+
+          '<div class="fmtgroup">'+['720','1440','2160'].map(v=>'<button data-shows="'+v+'" data-i="'+i+'" class="'+(t.shows===v?'on':'')+'">'+v+'</button>').join('')+'</div>'
+        : '')+
       // период установки — месяц + галочки групп
       '<label>Период установки Рекламы</label>'+
       '<p class="hint" style="margin:0 0 4px">Отметьте, что берёт клиент, и укажите месяц установки для каждой позиции отдельно.</p>'+
@@ -925,7 +908,9 @@ function applyCliType(){
   $('cliUrFields').style.display=S.cli==='ur'?'block':'none';
   $('cliPersonFields').style.display=S.cli==='ur'?'none':'block';
   $('cliNameLbl').textContent=S.cli==='fiz'?'ФИО (Фамилия Имя Отчество)':'ФИО (Фамилия Имя Отчество)';
-  if(S.cli==='ur'){$('cliBasis').value='Устава';} else if($('cliBasis').value==='Устава'){$('cliBasis').value='Свидетельства';}
+  if(S.cli==='ur'){$('cliBasis').value='Устава';}
+  else if(S.cli==='fiz'){$('cliBasis').value='Паспорта';}
+  else if($('cliBasis').value==='Устава'||$('cliBasis').value==='Паспорта'){$('cliBasis').value='Свидетельства';}
   refreshCliDerived();
 }
 
@@ -986,6 +971,12 @@ function bind(){
     const pl=e.target.closest('button[data-place]');
     if(pl){const i=+pl.dataset.i,t=S.tz[i];t.place=PLACE_OPTS[+pl.dataset.place];
       pl.closest('.tz').querySelectorAll('[data-place]').forEach(b=>b.classList.toggle('on',b===pl));
+      renderPreview();return;}
+    const sh=e.target.closest('button[data-shows]');
+    if(sh){const i=+sh.dataset.i,t=S.tz[i];t.shows=sh.dataset.shows;
+      sh.closest('.fmtgroup').querySelectorAll('[data-shows]').forEach(b=>b.classList.toggle('on',b===sh));
+      recomputeScreens(t);
+      sh.closest('.tz').querySelector('textarea[data-f="object"]').value=t.object;
       renderPreview();return;}
   });
 
