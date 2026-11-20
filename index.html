@@ -961,9 +961,9 @@ function buildPrint(){
 
   // Подробные адреса выбранных районов/объектов — в самом низу КП
   let addrHtml="";
-  const aTh=`background:#1b1f27;color:#fff;font-size:11px;text-align:left;padding:6px 8px`;
-  const aTd=`padding:5px 8px;border-bottom:1px solid #e6e8ec;font-size:11px`;
-  const aTot=`padding:6px 8px;font-size:11px;font-weight:800;background:#fff7c2;border-top:2px solid #111`;
+  const aTh=`background:#1b1f27;color:#fff;font-size:10px;text-align:left;padding:5px 7px`;
+  const aTd=`padding:3px 7px;border-bottom:1px solid #e6e8ec;font-size:10px;line-height:1.25`;
+  const aTot=`padding:4px 7px;font-size:10px;font-weight:800;background:#fff7c2;border-top:2px solid #111`;
   const addrStandTable=(name,rows)=>{ let fr=0,ap=0,rs=0;
     const body=rows.map((x,i)=>{fr+=x[1];ap+=x[2];rs+=x[3];
       return `<tr><td style="${aTd};text-align:center">${i+1}</td><td style="${aTd}">${x[0]}</td>
