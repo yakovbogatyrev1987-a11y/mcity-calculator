@@ -142,8 +142,9 @@
     transition:.25s;z-index:50;box-shadow:var(--shadow)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-  @page{size:A4 portrait;margin:10mm}
-  @media print{ body{background:#fff} .wrap{display:none} #printArea{display:block !important} }
+  @page{size:A4 portrait;margin:5mm}  /* при малом поле браузер НЕ печатает колонтитулы (адрес сайта, дату, № стр.) */
+  @media print{ body{background:#fff} .wrap{display:none} #printArea{display:block !important}
+    #printArea>div{padding:5mm 8mm !important} }
   #printArea{display:none}
 </style>
 </head>
@@ -320,7 +321,7 @@
           <button class="btn primary" id="btnWord">📝 Скачать Word (КП)</button>
           <button class="btn ghost" id="btnTg">📋 Скопировать для Telegram</button>
         </div>
-        <div class="hint" style="margin-top:8px">💡 Если в PDF сверху/снизу печатаются адрес сайта и номера страниц — снимите галочку «Верхние и нижние колонтитулы» в окне печати (один раз, браузер запомнит).</div>
+        <div class="hint" style="margin-top:8px">💡 PDF сохраняется без служебных пометок браузера (адрес сайта, дата, номера страниц) — ничего дополнительно отключать не нужно.</div>
       </div>
     </div>
   </div>
