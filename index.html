@@ -383,6 +383,7 @@ const S={
   video:false, videoFix:0,
   standsDiscount:0, screensDiscount:0,
   standsDiscMap:new Map(), // i -> % индивидуальной скидки района (месяц 1, без акции)
+  screensDiscMap:new Map(), // "g|i" -> % индивидуальной скидки объекта (месяц 1, без акции)
   sfera:"", pics:new Set(),
   client:"", manager:loadMgr()
 };
@@ -471,7 +472,9 @@ function renderScreens(q="",m=1){
     if(!items.length)return;
     html+=`<div class="grp">${grp.g}</div>`;
     items.forEach(({r,ii})=>{const key=gi+"|"+ii, sel=set.has(key), p=r.p[S.intensity], gift=gifts.has(key);
-      const body=sel?`<div class="body"><div class="minirow"><span class="pillchk ${gift?'sel':''}" data-giftscreen="${key}" data-m="${m}"><span class="b">${gift?'✓':''}</span>🎁 В подарок (0 ₽)</span></div></div>`:"";
+      const dv=S.screensDiscMap.has(key)?S.screensDiscMap.get(key):"";
+      const discInp=(m===1&&!S.screens2m)?`<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);margin-left:8px">скидка <input type="number" min="0" max="50" data-dscreen="${key}" value="${dv}" placeholder="${S.screensDiscount||0}" style="width:52px;padding:3px 6px;font-size:12px;border-radius:6px;text-align:center">%</span>`:"";
+      const body=sel?`<div class="body"><div class="minirow"><span class="pillchk ${gift?'sel':''}" data-giftscreen="${key}" data-m="${m}"><span class="b">${gift?'✓':''}</span>🎁 В подарок (0 ₽)</span>${discInp}</div></div>`:"";
       const pr=gift?'<b style="color:#36c08a">подарок</b>':'<b style="color:#e7eaf0">'+fmt(p)+' ₽</b>';
       html+=`<div class="it ${sel?'sel':''}" data-screen="${key}" data-m="${m}"><div class="head">
         <span class="chk">${sel?'✓':''}</span><span class="nm">${r.name}</span>
@@ -608,12 +611,24 @@ function calc(){
   let videoCost=0;
   if(S.screens.size||(S.screens2m&&S.screensM2.size)){ if(S.video)videoCost+=CFG.video.make; if(S.videoFix>0)videoCost+=CFG.video.fix*S.videoFix; }
 
-  let sc, scContacts, scRes, scUnits, giftScreens, scBase, scDiscSum, dC, scM=null;
+  let sc, scContacts, scRes, scUnits, giftScreens, scBase, scDiscSum, dC, scM=null, screensDiscLabel="";
   if(!S.screens2m){
     const g=screensGroup(S.screens,S.screensGifts,S.screensMonths);
     sc=g.sc; scContacts=g.contacts; scRes=g.res; scUnits=g.units; giftScreens=g.giftN;
     scBase=g.items+videoCost;
-    const d=discCalc(scBase,S.screensDiscount); dC=d.d; scDiscSum=d.s;
+    // скидка: у объекта может быть своя (screensDiscMap), иначе общая screensDiscount
+    dC=Math.min(50,Math.max(0,S.screensDiscount||0));
+    scDiscSum=0;
+    sc.forEach(x=>{
+      const d=S.screensDiscMap.has(x.key)?S.screensDiscMap.get(x.key):dC;
+      x.disc=Math.min(50,Math.max(0,d||0));
+      x.lineDisc=(x.gift||x.disc<=0)?x.line:rnd50(x.line*(1-x.disc/100));
+      scDiscSum+=x.line-x.lineDisc;
+    });
+    if(dC>0&&videoCost>0)scDiscSum+=videoCost-rnd50(videoCost*(1-dC/100));
+    // метка для итоговой строки: одинаковая скидка — «N%», разные — «(по объектам)»
+    const used=new Set(); sc.forEach(x=>{if(!x.gift)used.add(x.disc)});
+    screensDiscLabel = used.size===1 ? " "+[...used][0]+"%" : (used.size>1 ? " (по объектам)" : "");
   } else {
     const g1=screensGroup(S.screens,S.screensGifts,1), g2=screensGroup(S.screensM2,S.screensGiftsM2,1);
     const base1=g1.items+videoCost, base2=g2.items;
@@ -636,7 +651,7 @@ function calc(){
   return {st,sc,stM,scM,twoM:S.stands2m,twoScr:S.screens2m,standsBase,scBase,videoCost,base,discSum,total,contacts,totalRes,
     standsUnits,scUnits,giftStands,giftScreens,posRaw,posSum,posBreak,
     fullNoPromo,benefit,
-    standsDisc:dS,screensDisc:dC,standsDiscSum,scDiscSum,standsDiscLabel,cpc:contacts?total/contacts:0};
+    standsDisc:dS,screensDisc:dC,standsDiscSum,scDiscSum,standsDiscLabel,screensDiscLabel,cpc:contacts?total/contacts:0};
 }
 
 /* ---------- СВОДКА ---------- */
@@ -658,6 +673,9 @@ function render(){
   }
   const giftTag=x=>x.gift?' <span style="color:var(--ok)">🎁</span>':'';
   const val=x=>x.gift?'<span style="color:var(--ok)">подарок</span>':fmt(x.line)+' ₽';
+  // цена с индивидуальной/общей скидкой построчно (обычный режим, не акция)
+  const pval2=x=>x.gift?'<span style="color:var(--ok)">подарок</span>'
+    :(x.disc>0?`<span style="color:#8a8f98;text-decoration:line-through;font-size:11px">${fmt(x.line)}</span> ${fmt(x.lineDisc)} ₽`:fmt(x.line)+' ₽');
   let h="";
   if(r.stM){   // акция «2 месяца» — два блока, скидка авто по району
     const pval=x=>x.gift?'<span style="color:var(--ok)">подарок</span>'
@@ -669,8 +687,6 @@ function render(){
         `<div class="sline" style="font-weight:700"><span class="k">Итого за ${M.label.toLowerCase()}</span><span class="v">${fmt(M.total)} ₽</span></div></div>`;
     });
   } else if(r.st.length){
-    const pval2=x=>x.gift?'<span style="color:var(--ok)">подарок</span>'
-      :(x.disc>0?`<span style="color:#8a8f98;text-decoration:line-through;font-size:11px">${fmt(x.line)}</span> ${fmt(x.lineDisc)} ₽`:fmt(x.line)+' ₽');
     h+=`<div class="sblock"><div class="bt">Стенды</div>`+
       r.st.map(x=>`<div class="sline"><span class="k">${x.name} · ${x.fmt}${x.disc>0?' <span style="color:var(--accent-2)">−'+x.disc+'%</span>':''}${giftTag(x)}</span><span class="v">${pval2(x)}</span></div>`).join("")+
       (r.posSum?`<div class="sline"><span class="k">⭐ Позиционирование (${bt})</span><span class="v">${fmt(r.posSum)} ₽</span></div>`:"")+
@@ -685,9 +701,9 @@ function render(){
     });
   } else if(r.sc.length){
     h+=`<div class="sblock"><div class="bt">Экраны · ${CFG.intensity[S.intensity].label}/сут</div>`+
-      r.sc.map(x=>`<div class="sline"><span class="k">${x.name}${giftTag(x)}</span><span class="v">${val(x)}</span></div>`).join("")+
+      r.sc.map(x=>`<div class="sline"><span class="k">${x.name}${x.disc>0?' <span style="color:var(--accent-2)">−'+x.disc+'%</span>':''}${giftTag(x)}</span><span class="v">${pval2(x)}</span></div>`).join("")+
       (r.videoCost?`<div class="sline"><span class="k">Видео${S.videoFix>0?' + '+S.videoFix+' корр.':''}</span><span class="v">${fmt(r.videoCost)} ₽</span></div>`:"")+
-      (r.screensDisc>0?`<div class="sline disc"><span class="k">Скидка на экраны ${r.screensDisc}%</span><span class="v">−${fmt(r.scDiscSum)} ₽</span></div>`:"")+`</div>`;
+      (r.scDiscSum>0?`<div class="sline disc"><span class="k">Скидка на экраны${r.screensDiscLabel}</span><span class="v">−${fmt(r.scDiscSum)} ₽</span></div>`:"")+`</div>`;
   }
   if(r.benefit>0) h+=`<div class="sline" style="border:none"><span class="k" style="color:var(--ok);font-weight:700">🎁 Выгода клиента</span><span class="v" style="color:var(--ok)">−${fmt(r.benefit)} ₽</span></div>`;
   $("#lines").innerHTML=h;
@@ -776,9 +792,9 @@ function tgText(){
   } else if(r.sc.length){
     L.push("\n📺 Экраны в лифтах");
     L.push("Интенсивность: "+CFG.intensity[S.intensity].label+"/сутки, "+S.screensMonths+" "+plural(S.screensMonths,"месяц","месяца","месяцев"));
-    L.push(alignTable(r.sc.map(x=>{const t=priceTriple(x,r.screensDisc);return [x.name, wScreen(x.count), t[0], t[1], t[2]];}),["L","L","R","R","L"]));
+    L.push(alignTable(r.sc.map(x=>{const t=priceTriple(x,x.disc);return [x.name, wScreen(x.count), t[0], t[1], t[2]];}),["L","L","R","R","L"]));
     if(r.videoCost)L.push("+ видеоролик: "+fmt(r.videoCost)+" ₽");
-    if(r.screensDisc>0)L.push("Скидка на экраны "+r.screensDisc+"%: −"+fmt(r.scDiscSum)+" ₽");
+    if(r.scDiscSum>0)L.push("Скидка на экраны"+r.screensDiscLabel+": −"+fmt(r.scDiscSum)+" ₽");
   }
 
   L.push("");
@@ -923,7 +939,7 @@ function buildPrint(){
       list.map(x=>`<tr><td style="${td}">${x.name}${x.gift?' <span style="color:#1a9e6c">🎁</span>':''}</td><td style="${td};text-align:right">${x.count}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.res):'—'}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.contacts):'—'}</td>
-        <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,disc)}</td></tr>`).join("")+
+        <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,x.disc!=null?x.disc:disc)}${x.disc>0?' <span style="color:'+RED+';font-size:10px">−'+x.disc+'%</span>':''}</td></tr>`).join("")+
       (withVideo&&r.videoCost?`<tr><td style="${td}" colspan="4">Разработка видеоролика${S.videoFix>0?' + '+S.videoFix+' корректировки':''}</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.videoCost,disc)}</td></tr>`:"")+`</table>`;
   let screensHtml="";
   if(r.sc.length){
@@ -942,15 +958,17 @@ function buildPrint(){
       screensHtml+=screensRows(r.sc,dC,true);
       if(r.giftScreens>0)screensHtml+=`<div style="color:#1a9e6c;font-size:12px;margin-top:4px">🎁 Акция: ${r.giftScreens} ${plural(r.giftScreens,"объект","объекта","объектов")} в подарок.</div>`;
     }
-    screensHtml+=`<div style="margin-top:12px;text-align:center"><img src="assets/screen.jpg" style="max-height:360px;max-width:60%;border-radius:8px;border:1px solid #ddd">
-      <div style="color:#888;font-size:11px;margin-top:4px">Экран 21,5″ Full HD в лифте элитного дома</div></div>`;
+    // фото экрана — ПОД итогами, после матрицы/фото стендов (как у стендов)
+    visualHtml+=`<div style="margin-top:14px;page-break-inside:avoid;break-inside:avoid;text-align:center"><div style="font-weight:700;font-size:13px;margin-bottom:6px">Экраны в лифтах</div>
+      <img src="assets/screen.jpg" style="max-height:360px;max-width:60%;border-radius:8px;border:1px solid #ddd">
+      <div style="color:#888;font-size:11px;margin-top:4px">Как выглядит реклама: экран 21,5″ Full HD в лифте элитного дома</div></div>`;
   }
 
   const totalHtml=`${sec("Стоимость и эффективность")}
     <table style="width:100%;border-collapse:collapse;font-size:15px">
       ${r.base!==r.total?`<tr><td style="${td}">Стоимость размещения</td><td style="${td};text-align:right">${fmt(r.base)} ₽</td></tr>`:""}
       ${r.standsDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на стенды${r.twoM?' (акция, по районам)':r.standsDiscLabel}</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.standsDiscSum)} ₽</td></tr>`:""}
-      ${r.scDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на экраны${r.twoScr?' (по месяцам)':' '+r.screensDisc+'%'}</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.scDiscSum)} ₽</td></tr>`:""}
+      ${r.scDiscSum>0?`<tr><td style="${td};color:${RED}">Скидка на экраны${r.twoScr?' (по месяцам)':r.screensDiscLabel}</td><td style="${td};text-align:right;color:${RED}">−${fmt(r.scDiscSum)} ₽</td></tr>`:""}
       <tr><td style="padding:12px 10px;border-top:2px solid #111;font-size:20px;font-weight:800">ИТОГО</td>
       <td style="padding:12px 10px;border-top:2px solid #111;font-size:20px;font-weight:800;text-align:right;color:${RED}">${fmt(r.total)} ₽</td></tr>
     </table>
@@ -1202,17 +1220,25 @@ function bind(){
       renderScreens(scSearchFor(m),m);render();return;}
     const head=e.target.closest(".head");if(!head)return;
     const it=head.closest("[data-screen]"); const k=it.dataset.screen,m=+it.dataset.m; const set=scSet(m),g=scGifts(m);
-    if(set.has(k)){set.delete(k);g.delete(k);}else set.add(k);
+    if(set.has(k)){set.delete(k);g.delete(k);if(m===1)S.screensDiscMap.delete(k);}else set.add(k);
     renderScreens(scSearchFor(m),m);render();};
   $("#screensList").addEventListener("click",onScreenClick);
   $("#screensList2").addEventListener("click",onScreenClick);
+  // индивидуальная скидка объекта (месяц 1, без акции)
+  $("#screensList").addEventListener("input",e=>{
+    const d=e.target.closest("[data-dscreen]"); if(!d)return;
+    const k=d.dataset.dscreen;
+    if(d.value===""){S.screensDiscMap.delete(k);render();return;}
+    const v=Math.min(50,Math.max(0,+d.value||0));
+    if(v>0)S.screensDiscMap.set(k,v); else S.screensDiscMap.delete(k);
+    render();});
   $("#screensSearch").addEventListener("input",e=>renderScreens(e.target.value,1));
   $("#screensSearch2").addEventListener("input",e=>renderScreens(e.target.value,2));
   // переключатель 1/2 месяца по экранам
   document.querySelectorAll("[data-mms]").forEach(el=>el.addEventListener("click",()=>{
     const two=+el.dataset.mms===2;
     if(two && S.screens2m===false && S.screensM2.size===0){ S.screens.forEach(k=>S.screensM2.add(k)); S.screensGifts.forEach(k=>S.screensGiftsM2.add(k)); }
-    S.screens2m=two; updateScreensMode(); renderScreens(scSearchFor(2),2); render();
+    S.screens2m=two; updateScreensMode(); renderScreens(scSearchFor(1),1); renderScreens(scSearchFor(2),2); render();
   }));
 
   // действия
@@ -1221,7 +1247,7 @@ function bind(){
     if(a==="clear-stands"){S.stands.clear();S.standsGifts.clear();S.standsDiscMap.clear();S.slotsStd.clear();S.slotsSouth.clear();renderStands(searchFor(1),1);}
     if(a==="clear-stands2"){S.standsM2.clear();S.standsGiftsM2.clear();renderStands(searchFor(2),2);}
     if(a==="copy-m2"){S.standsM2.clear();S.standsGiftsM2.clear();S.stands.forEach((f,i)=>S.standsM2.set(i,f));S.standsGifts.forEach(i=>S.standsGiftsM2.add(i));renderStands(searchFor(2),2);}
-    if(a==="clear-screens"){S.screens.clear();S.screensGifts.clear();renderScreens(scSearchFor(1),1);}
+    if(a==="clear-screens"){S.screens.clear();S.screensGifts.clear();S.screensDiscMap.clear();renderScreens(scSearchFor(1),1);}
     if(a==="clear-screens2"){S.screensM2.clear();S.screensGiftsM2.clear();renderScreens(scSearchFor(2),2);}
     if(a==="copy-scrm2"){S.screensM2.clear();S.screensGiftsM2.clear();S.screens.forEach(k=>S.screensM2.add(k));S.screensGifts.forEach(k=>S.screensGiftsM2.add(k));renderScreens(scSearchFor(2),2);}
     if(a==="pics-all"&&S.sfera!==""){SFERI[+S.sfera].imgs.forEach((_,i)=>S.pics.add(i));renderThumbs();}
