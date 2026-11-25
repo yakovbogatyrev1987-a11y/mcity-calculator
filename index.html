@@ -171,7 +171,9 @@
             <div class="opts">
               <span class="opt sel" data-mm="1">1 месяц<br><span class="mini">стандарт</span></span>
               <span class="opt" data-mm="2">2 месяца<br><span class="mini">акция</span></span>
+              <span class="opt" data-mm="3">Комбо<br><span class="mini">стенды + экраны</span></span>
             </div>
+            <div class="hint" id="comboNote" style="display:none;line-height:1.5">🔥 <b>Акция КОМБО:</b> при покупке стендов экраны идут по <b>490 ₽/экран</b> (720 показов). Не участвуют элитные ЖК: Удачный, Арбан Смарт (оба), Александровский, Скандис Озеро, Сити Квартал Бограда, Лазурный, Академгородок, Парковый, Южный Берег.</div>
           </div>
           <div class="field">
             <label class="lbl" id="lblM1" style="display:none">🗓️ Месяц 1 — районы</label>
@@ -349,6 +351,9 @@ const CFG=DATA.config, V=CFG.viewsPerResidentMonth;
 const POP_STANDS=new Set(["Взлётка 1","Взлётка 2","Северный 1","Северный 2","Октябрьский 1","Октябрьский 2","Мясокомбинат","Покровка","Белые Росы","Южный Берег · у входа в лифт","Солнечный 1","Солнечный 2"]);
 const UNPOP_STANDS=new Set(["Зелёная Роща 1","Зелёная Роща 2","Железнодорожный 1","Железнодорожный 2","Центральный","Солнечный 3","Свердловский 1","Свердловский 2","Кировский 1","Кировский 2","Ленинский 1","Ленинский 2","Образцово · у входа в лифт","Северный 3"]);
 function promoDiscStand(name,month){ if(POP_STANDS.has(name))return month===1?10:15; if(UNPOP_STANDS.has(name))return month===1?15:20; return 0; }
+// Акция «КОМБО» (стенды + экраны): экраны по 490 ₽/экран. Не участвуют элитные ЖК (группа «Бизнес»)
+const COMBO_PRICE=490, COMBO_IFACT=[1,1.5,2]; // множитель по интенсивности 720/1440/2160
+const COMBO_EXCLUDED=new Set(["ЖК Удачный","ЖК Арбан Smart на Линейной / Бульвар Цветов","ЖК Александровский","ЖК Scandis Ozero","ЖК Арбан Smart на Краснодарской","ЖК Сити Квартал Бограда","ЖК Лазурный","ЖК Академгородок","ЖК Парковый","ЖК Южный Берег"]);
 
 /* Матрицы стендов (точная сетка из xlsx). Слот: [col,row,colSpan,rowSpan,формат] */
 const MATRIX={
@@ -369,6 +374,7 @@ const S={
   stands:new Map(),        // i -> formatIndex (месяц 1)
   standsGifts:new Set(),   // i (район в подарок, месяц 1)
   stands2m:false,          // акция «2 месяца»
+  combo:false,             // акция «Комбо»: стенды + экраны → экраны по 490 ₽/экран
   standsM2:new Map(),      // i -> formatIndex (месяц 2)
   standsGiftsM2:new Set(), // i (район в подарок, месяц 2)
   standsDiscount2:0,       // скидка на месяц 2, %
@@ -451,7 +457,9 @@ function renderStands(q="",m=1){
 }
 function updateStandsMode(){
   const two=S.stands2m;
-  document.querySelectorAll("[data-mm]").forEach(x=>x.classList.toggle("sel",(+x.dataset.mm===2)===two));
+  const mode=S.combo?3:(two?2:1);
+  document.querySelectorAll("[data-mm]").forEach(x=>x.classList.toggle("sel",+x.dataset.mm===mode));
+  $("#comboNote").style.display=S.combo?"":"none";
   $("#lblM1").style.display=two?"":"none";
   $("#fieldM2").style.display=two?"":"none";
   $("#fieldPeriods").style.display=two?"none":"";
@@ -598,13 +606,17 @@ function calc(){
   }
 
   // расчёт экранов по одной выборке (месяцу)
+  const comboOn=S.combo&&S.stands.size>0&&!S.screens2m;  // комбо: нужны стенды, без акции «2 месяца» по экранам
   function screensGroup(set,gifts,months){
     const sc=[]; let items=0,contacts=0,res=0,units=0,giftN=0;
     set.forEach(key=>{const[gi,ii]=key.split("|").map(Number); const r=DATA.screens[gi].items[ii];
       const gift=gifts.has(key);
-      const pm=r.p[S.intensity], line=gift?0:pm*months, c=r.res*V*months;
+      const pmFull=r.p[S.intensity];
+      const combo=comboOn&&!COMBO_EXCLUDED.has(r.name);
+      const pm=combo?COMBO_PRICE*COMBO_IFACT[S.intensity]*r.count:pmFull;
+      const line=gift?0:pm*months, c=r.res*V*months;
       items+=line; contacts+=c; res+=r.res; units+=r.count; if(gift)giftN++;
-      sc.push({key,name:r.name,count:r.count,res:r.res,gift,line,full:pm*months,contacts:c,cpc:(!gift&&r.res)?pm/(r.res*V):0});
+      sc.push({key,name:r.name,count:r.count,res:r.res,gift,combo,line,full:pmFull*months,contacts:c,cpc:(!gift&&r.res)?pm/(r.res*V):0});
     });
     return {sc,items,contacts,res,units,giftN};
   }
@@ -621,6 +633,7 @@ function calc(){
     dC=Math.min(50,Math.max(0,S.screensDiscount||0));
     scDiscSum=0;
     sc.forEach(x=>{
+      if(x.combo){x.disc=0;x.lineDisc=x.line;return;}   // комбо — цена фиксированная, скидки не суммируются
       const d=S.screensDiscMap.has(x.key)?S.screensDiscMap.get(x.key):dC;
       x.disc=Math.min(50,Math.max(0,d||0));
       x.lineDisc=(x.gift||x.disc<=0)?x.line:rnd50(x.line*(1-x.disc/100));
@@ -628,7 +641,7 @@ function calc(){
     });
     if(dC>0&&videoCost>0)scDiscSum+=videoCost-rnd50(videoCost*(1-dC/100));
     // метка для итоговой строки: одинаковая скидка — «N%», разные — «(по объектам)»
-    const used=new Set(); sc.forEach(x=>{if(!x.gift)used.add(x.disc)});
+    const used=new Set(); sc.forEach(x=>{if(!x.gift&&!x.combo)used.add(x.disc)});
     screensDiscLabel = used.size===1 ? " "+[...used][0]+"%" : (used.size>1 ? " (по объектам)" : "");
   } else {
     const g1=screensGroup(S.screens,S.screensGifts,1), g2=screensGroup(S.screensM2,S.screensGiftsM2,1);
@@ -652,7 +665,8 @@ function calc(){
   return {st,sc,stM,scM,twoM:S.stands2m,twoScr:S.screens2m,standsBase,scBase,videoCost,base,discSum,total,contacts,totalRes,
     standsUnits,scUnits,giftStands,giftScreens,posRaw,posSum,posBreak,
     fullNoPromo,benefit,
-    standsDisc:dS,screensDisc:dC,standsDiscSum,scDiscSum,standsDiscLabel,screensDiscLabel,cpc:contacts?total/contacts:0};
+    standsDisc:dS,screensDisc:dC,standsDiscSum,scDiscSum,standsDiscLabel,screensDiscLabel,cpc:contacts?total/contacts:0,
+    comboActive:comboOn&&sc.some(x=>x.combo)};
 }
 
 /* ---------- СВОДКА ---------- */
@@ -676,7 +690,8 @@ function render(){
   const val=x=>x.gift?'<span style="color:var(--ok)">подарок</span>':fmt(x.line)+' ₽';
   // цена с индивидуальной/общей скидкой построчно (обычный режим, не акция)
   const pval2=x=>x.gift?'<span style="color:var(--ok)">подарок</span>'
-    :(x.disc>0?`<span style="color:#8a8f98;text-decoration:line-through;font-size:11px">${fmt(x.line)}</span> ${fmt(x.lineDisc)} ₽`:fmt(x.line)+' ₽');
+    :(x.combo?`<span style="color:#8a8f98;text-decoration:line-through;font-size:11px">${fmt(x.full)}</span> ${fmt(x.line)} ₽`
+    :(x.disc>0?`<span style="color:#8a8f98;text-decoration:line-through;font-size:11px">${fmt(x.line)}</span> ${fmt(x.lineDisc)} ₽`:fmt(x.line)+' ₽'));
   let h="";
   if(r.stM){   // акция «2 месяца» — два блока, скидка авто по району
     const pval=x=>x.gift?'<span style="color:var(--ok)">подарок</span>'
@@ -702,7 +717,8 @@ function render(){
     });
   } else if(r.sc.length){
     h+=`<div class="sblock"><div class="bt">Экраны · ${CFG.intensity[S.intensity].label}/сут</div>`+
-      r.sc.map(x=>`<div class="sline"><span class="k">${x.name}${x.disc>0?' <span style="color:var(--accent-2)">−'+x.disc+'%</span>':''}${giftTag(x)}</span><span class="v">${pval2(x)}</span></div>`).join("")+
+      (r.comboActive?`<div class="hint" style="margin:-2px 0 6px">🔥 Акция КОМБО: экраны по 490 ₽/экран (стенды + экраны)</div>`:"")+
+      r.sc.map(x=>`<div class="sline"><span class="k">${x.name}${x.combo?' <span style="color:var(--accent-2)">КОМБО</span>':''}${x.disc>0?' <span style="color:var(--accent-2)">−'+x.disc+'%</span>':''}${giftTag(x)}</span><span class="v">${pval2(x)}</span></div>`).join("")+
       (r.videoCost?`<div class="sline"><span class="k">Видео${S.videoFix>0?' + '+S.videoFix+' корр.':''}</span><span class="v">${fmt(r.videoCost)} ₽</span></div>`:"")+
       (r.scDiscSum>0?`<div class="sline disc"><span class="k">Скидка на экраны${r.screensDiscLabel}</span><span class="v">−${fmt(r.scDiscSum)} ₽</span></div>`:"")+`</div>`;
   }
@@ -760,8 +776,9 @@ function tgText(){
   // цена → 3 колонки: [было →] [итог] [скидка]. Итог («25 904 ₽» / «подарок») в общей колонке
   const priceTriple=(x,disc)=> x.gift
     ? (x.full>0 ? [fmt(x.full)+" ₽ →","подарок",""] : ["","подарок",""])
+    : (x.combo ? [fmt(x.full)+" ₽ →", fmt(x.line)+" ₽", "(КОМБО 490 ₽/экран)"]
     : (disc>0 ? [fmt(x.line)+" ₽ →", fmt(rnd50(x.line*(1-disc/100)))+" ₽", "(скидка "+disc+"%)"]
-              : ["", fmt(x.line)+" ₽", ""]);
+              : ["", fmt(x.line)+" ₽", ""]));
 
   L.push("Добрый день — составила для вас индивидуальное предложение с учётом пожеланий по охватам и расположению вашего бизнеса.");
   if(S.client)L.push("Для: "+S.client);
@@ -792,6 +809,7 @@ function tgText(){
     });
   } else if(r.sc.length){
     L.push("\n📺 Экраны в лифтах");
+    if(r.comboActive)L.push("🔥 Акция КОМБО (стенды + экраны): экраны по 490 ₽/экран. Элитные ЖК — по обычному прайсу.");
     L.push("Интенсивность: "+CFG.intensity[S.intensity].label+"/сутки, "+S.screensMonths+" "+plural(S.screensMonths,"месяц","месяца","месяцев"));
     L.push(alignTable(r.sc.map(x=>{const t=priceTriple(x,x.disc);return [x.name, wScreen(x.count), t[0], t[1], t[2]];}),["L","L","R","R","L"]));
     if(r.videoCost)L.push("+ видеоролик: "+fmt(r.videoCost)+" ₽");
@@ -940,7 +958,7 @@ function buildPrint(){
       list.map(x=>`<tr><td style="${td}">${x.name}${x.gift?' <span style="color:#1a9e6c">🎁</span>':''}</td><td style="${td};text-align:right">${x.count}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.res):'—'}</td>
         <td style="${td};text-align:right">${x.res?fmt(x.contacts):'—'}</td>
-        <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):priceCell(x.line,x.disc!=null?x.disc:disc)}${x.disc>0?' <span style="color:'+RED+';font-size:10px">−'+x.disc+'%</span>':''}</td></tr>`).join("")+
+        <td style="${td};text-align:right;font-weight:700">${x.gift?giftCell(x.full):x.combo?`<span style="color:#9aa0a8;font-weight:400;text-decoration:line-through">${fmt(x.full)} ₽</span> <span style="color:${RED};font-weight:800">${fmt(x.line)} ₽</span> <span style="color:${RED};font-size:10px">КОМБО</span>`:priceCell(x.line,x.disc!=null?x.disc:disc)}${x.disc>0?' <span style="color:'+RED+';font-size:10px">−'+x.disc+'%</span>':''}</td></tr>`).join("")+
       (withVideo&&r.videoCost?`<tr><td style="${td}" colspan="4">Разработка видеоролика${S.videoFix>0?' + '+S.videoFix+' корректировки':''}</td><td style="${td};text-align:right;font-weight:700">${priceCell(r.videoCost,disc)}</td></tr>`:"")+`</table>`;
   let screensHtml="";
   if(r.sc.length){
@@ -956,6 +974,7 @@ function buildPrint(){
     } else {
       screensHtml+=sec("Экраны в лифтах · элитные дома");
       screensHtml+=`<div style="color:#444;font-size:13px;margin-bottom:8px">Интенсивность: <b>${CFG.intensity[S.intensity].label} в сутки</b> · срок: <b>${S.screensMonths} ${plural(S.screensMonths,"месяц","месяца","месяцев")}</b> · ролик до 10 сек</div>`;
+      if(r.comboActive)screensHtml+=`<div style="color:${RED};font-size:12px;margin-bottom:8px">🔥 Акция КОМБО (стенды + экраны): размещение на экранах — <b>490 ₽/экран</b>. В акции не участвуют элитные ЖК (Удачный, Арбан Смарт, Александровский, Скандис Озеро, Сити Квартал Бограда, Лазурный, Академгородок, Парковый, Южный Берег) — они по обычному прайсу.</div>`;
       screensHtml+=screensRows(r.sc,dC,true);
       if(r.giftScreens>0)screensHtml+=`<div style="color:#1a9e6c;font-size:12px;margin-top:4px">🎁 Акция: ${r.giftScreens} ${plural(r.giftScreens,"объект","объекта","объектов")} в подарок.</div>`;
     }
@@ -1192,11 +1211,12 @@ function bind(){
     render();});
   $("#standsSearch").addEventListener("input",e=>renderStands(e.target.value,1));
   $("#standsSearch2").addEventListener("input",e=>renderStands(e.target.value,2));
-  // переключатель 1/2 месяца
+  // переключатель 1/2 месяца + комбо
   document.querySelectorAll("[data-mm]").forEach(el=>el.addEventListener("click",()=>{
-    const two=+el.dataset.mm===2;
+    const mm=+el.dataset.mm, two=mm===2;
     if(two && S.stands2m===false && S.standsM2.size===0){ // при первом включении копируем месяц 1
       S.stands.forEach((f,i)=>S.standsM2.set(i,f)); S.standsGifts.forEach(i=>S.standsGiftsM2.add(i)); }
+    S.combo=(mm===3);
     S.stands2m=two; updateStandsMode(); renderStands(searchFor(1),1); renderStands(searchFor(2),2); render();
   }));
 
